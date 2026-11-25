@@ -35,3 +35,11 @@ khepri:
 Compose:
   ModifierMissing:
     active: true
+  CompositionLocalAllowlist:
+    active: true
+    allowedCompositionLocals:
+      - LocalColors
+      - LocalSpacing
+      - LocalRadii
+      - LocalTextStyles
+      - LocalReduceMotion

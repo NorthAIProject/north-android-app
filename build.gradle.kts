@@ -36,7 +36,10 @@ dependencyAnalysis {
             onUnusedDependencies { exclude("com.google.dagger:hilt-android") }
         }
     }
-    structure { bundle("junit-jupiter") { includeGroup("org.junit.jupiter") } }
+    structure {
+        bundle("junit-jupiter") { includeGroup("org.junit.jupiter") }
+        bundle("roborazzi") { includeGroup("io.github.takahirom.roborazzi") }
+    }
 }
 
 tasks.named("check") { dependsOn("assertModuleGraph", "buildHealth", "spotlessCheck") }

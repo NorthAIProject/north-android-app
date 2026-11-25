@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_offline_title">Sem ligação</string>
+    <string name="error_offline_body">Verifica a ligação e tenta outra vez.</string>
+    <string name="error_generic_title">Não foi possível carregar</string>
+    <string name="error_generic_body">Algo correu mal do nosso lado. Tenta outra vez daqui a pouco.</string>
+    <string name="error_try_again">Tentar outra vez</string>
+</resources>

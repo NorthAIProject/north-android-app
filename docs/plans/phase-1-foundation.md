@@ -438,12 +438,23 @@ Done 2026-11-25 (22 tests, plus the device-only `KeystoreTokenCipherTest`). Devi
 **Interfaces:**
 - Produces: `KhepriTheme(appearance: Appearance = Appearance.System, content: @Composable () -> Unit)`, `KhepriTheme.colors`, `.spacing`, `.shapes`; `enum class Appearance { System, Light, Dark }` (in `:core:designsystem`); `Loadable<T>` and `ActionState` as in `docs/design.md` 6.3; `LocalReduceMotion: ProvidableCompositionLocal<Boolean>` (true when the animator duration scale is 0); `enum class Haptic { Success, Selection, Warning, Error, Heavy }` with `fun View.perform(haptic: Haptic)`.
 
-- [ ] **Step 1:** Read `K/scripts/sync-theme.py` to find its input; write `tools/sync_theme.py` to emit light and dark `Color` values for every token.
-- [ ] **Step 2:** `ThemeTokensTest`: light Background `#F5F2EB`, dark Background `#0C111B`, light Signal `#846328`, dark Signal `#E0B86A`, light Destructive `#9E413D`, dark Destructive `#D27E7C`; radii 6, 10, 12, 16 dp; spacing 4, 8, 12, 16, 20, 24 dp.
-- [ ] **Step 3:** Theme: Material 3 colour scheme built from tokens; dynamic colour off; Geist for all text styles, Marcellus as `displayBrand`, Geist Mono as `mono`.
-- [ ] **Step 4:** Components: cards have no shadow; prominent button; text field with a trailing icon that has a content description and a 48 dp target.
-- [ ] **Step 5:** Roborazzi screenshots of each component: light/dark × font scale 1.0/2.0. Record and commit the goldens. Add `verifyRoborazzi` to `check`.
-- [ ] **Step 6:** `./gradlew :core:designsystem:check :core:ui:check`. Expected: PASS. Commit.
+- [x] **Step 1:** Read `K/scripts/sync-theme.py` to find its input; write `tools/sync_theme.py` to emit light and dark `Color` values for every token.
+- [x] **Step 2:** `ThemeTokensTest`: light Background `#F5F2EB`, dark Background `#0C111B`, light Signal `#846328`, dark Signal `#E0B86A`, light Destructive `#9E413D`, dark Destructive `#D27E7C`; radii 6, 10, 12, 16 dp; spacing 4, 8, 12, 16, 20, 24 dp.
+- [x] **Step 3:** Theme: Material 3 colour scheme built from tokens; dynamic colour off; Geist for all text styles, Marcellus as `displayBrand`, Geist Mono as `mono`.
+- [x] **Step 4:** Components: cards have no shadow; prominent button; text field with a trailing icon that has a content description and a 48 dp target.
+- [x] **Step 5:** Roborazzi screenshots of each component: light/dark × font scale 1.0/2.0. Record and commit the goldens. Add `verifyRoborazzi` to `check`.
+- [x] **Step 6:** `./gradlew :core:designsystem:check :core:ui:check`. Expected: PASS. Commit.
+
+Done 2026-11-25 (11 tests, 26 screenshots). Deviations:
+- Colours are **Display P3**: `Color(r, g, b, a, ColorSpaces.DisplayP3)`, with the same components iOS writes into its colour sets. The plan's hex values are those P3 components. `tools/sync_theme.py` uses the iOS script's OKLCH → P3 conversion and copies the three iOS-pinned tokens (BodyIdle, BodyShell, HeatLow) from the iOS colour sets.
+- Material 3 mapping: `primary` = `signal` and `onPrimary` = `primaryForeground`. iOS tints controls with signal, and the web `--primary` (navy/cream) becomes M3 `secondary`.
+- `Spacing` (4/8/12/16/20/24) is new; iOS has no spacing enum. `Radii` mirrors `NorthRadius`.
+- `KhepriTextStyles` holds `displayBrand` (Marcellus), `mono` (Geist Mono) and `eyebrow`. Geist and Geist Mono are variable fonts, loaded at weights 300 to 700 through `FontVariation`. The OFL licences are in `core/designsystem/licenses/`.
+- `TrailingAction` takes a `Painter` (material-icons is not a dependency). `clearIcon()` is the shared clear glyph.
+- `:core:testing` has `MainDispatcherExtension` (JUnit 5) instead of a JUnit 4 rule, because unit tests run on JUnit 5.
+- Screenshot tests render one composition per test and switch variants through state, capturing `onRoot()`. Separate `captureRoboImage {}` calls in one test sometimes recorded blank frames.
+- `khepri.screenshot` makes `check` depend on `verifyRoborazziDebug` and adds the vintage engine with the JUnit BOM. Dependency analysis treats the roborazzi group as one bundle.
+- `:core:ui` `ErrorState` has its own strings in the four locales ("Offline" and "Try Again" reuse the iOS translations). It is tested with two screenshots and a click.
 
 ### Task 9: `:core:navigation` — destinations and deep links
 

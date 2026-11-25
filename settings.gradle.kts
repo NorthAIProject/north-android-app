@@ -21,6 +21,8 @@ include(":app")
 
 include(":core:model", ":core:common", ":core:api", ":core:network", ":core:datastore", ":core:session")
 
+include(":core:designsystem", ":core:ui", ":core:testing")
+
 include(":detekt-rules")
 
 project(":detekt-rules").projectDir = file("build-logic/detekt-rules")

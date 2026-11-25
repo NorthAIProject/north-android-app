@@ -17,10 +17,14 @@ class ScreenshotPlugin : Plugin<Project> {
             extensions.configure<RoborazziExtension> {
                 outputDir.set(layout.projectDirectory.dir("src/test/screenshots"))
             }
+            tasks.named("check") { dependsOn("verifyRoborazziDebug") }
             dependencies {
                 add("testRuntimeOnly", lib("robolectric"))
+                add("testRuntimeOnly", platform(lib("junit-bom")))
+                add("testRuntimeOnly", lib("junit-vintage-engine"))
                 add("testImplementation", lib("robolectric-annotations"))
                 add("testImplementation", lib("roborazzi"))
+                add("testImplementation", lib("roborazzi-compose"))
                 add("testImplementation", lib("androidx-test-ext-junit"))
             }
         }
