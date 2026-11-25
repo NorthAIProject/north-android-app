@@ -29,7 +29,7 @@ public fun SurfaceCard(
         shape = RoundedCornerShape(KhepriTheme.radii.large),
         color = KhepriTheme.colors.card,
         contentColor = KhepriTheme.colors.cardForeground,
-        border = BorderStroke(0.5.dp, KhepriTheme.colors.hairline.copy(alpha = HAIRLINE_OPACITY)),
+        border = BorderStroke(0.5.dp, KhepriTheme.colors.hairline.let { it.copy(alpha = it.alpha * HAIRLINE_OPACITY) }),
     ) {
         Column(Modifier.padding(contentPadding), content = content)
     }

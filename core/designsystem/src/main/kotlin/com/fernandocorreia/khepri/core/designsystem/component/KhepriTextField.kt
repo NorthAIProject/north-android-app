@@ -2,6 +2,7 @@ package com.fernandocorreia.khepri.core.designsystem.component
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -11,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import com.fernandocorreia.khepri.core.designsystem.R
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriTheme
@@ -26,6 +28,9 @@ public fun KhepriTextField(
     error: String? = null,
     singleLine: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    enabled: Boolean = true,
 ) {
     OutlinedTextField(
         value = value,
@@ -44,6 +49,9 @@ public fun KhepriTextField(
         supportingText = error?.let { message -> { Text(message) } },
         singleLine = singleLine,
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        visualTransformation = visualTransformation,
+        enabled = enabled,
         shape = RoundedCornerShape(KhepriTheme.radii.control),
     )
 }

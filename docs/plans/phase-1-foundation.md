@@ -472,6 +472,24 @@ The owner's rule is a Fable review after every task. This review covered Tasks 4
 10. A key lost mid-run left a signed-in shell sending bare requests. `StoredTokenSource` now posts the signal when a protected request finds no session.
 11. `ApiServices` is now `@Singleton`. The `ACTION_USER_UNLOCKED` receiver was removed: the app is not direct-boot aware, so it never fired, and `ON_START` covers the retry.
 
+### Fable review of Task 8 (2026-11-25)
+
+Eleven findings. Fixed: 1 to 10. Left for the owner: 11.
+
+1. The card edge replaced the hairline alpha instead of scaling it. It was 8 to 10 times stronger than iOS `hairline.opacity(0.6)`; it now multiplies.
+2. The text field outline was `border` (about 1.4:1). It is now the web's `--input` token (3.3:1 light, 3.4:1 dark). `sync_theme.py` emits `input`.
+3. Nine Material slots were left at baseline purple (`surfaceTint`, `inverseSurface`, `inverseOnSurface`, `inversePrimary`, `tertiaryContainer`, `errorContainer` and the rest). Every slot is now mapped from tokens.
+4. `outlineVariant` was the 10 to 12% hairline, which made the outlined button edge invisible. It is now `border`.
+5. `ErrorState` scrolls, so Try Again stays reachable at 200% font. A blank server message falls back to the default copy.
+6. Screenshots were 320 px at mdpi. They are now 360 dp at xhdpi. Added: `ErrorState` at 2x font and in pt-PT.
+7. `ThemeTokensTest` now checks WCAG AA on the Material scheme: 4.5:1 for every text pair and 3:1 for `outline`, in both modes. `sync_theme.py --check` detects a hand-edited or stale `KhepriColors.kt`. It needs the web checkout, so it runs locally, not in CI.
+8. The two colour schemes are built once, not on every recomposition.
+9. `KhepriTextField` takes `visualTransformation`, `keyboardActions` and `enabled`, which the sign-in screen needs. `TrailingAction` is a data class.
+10. `:core:testing` exposes coroutines-test and JUnit Jupiter as `api`; `:core:ui` exposes `:core:model`.
+11. **Owner verdict:** Material's baseline letter spacing (0.5 sp on `bodyLarge`, tuned for Roboto) is still applied to Geist, where iOS uses none.
+
+Note: Material 3 1.5 outlined buttons label in `onSurfaceVariant` (muted), not `primary`. That is the library default and is kept.
+
 ### Task 9: `:core:navigation` — destinations and deep links
 
 **Files:**

@@ -6,7 +6,10 @@ is OKLCH in north-web-app/src/lib/styles/app.css, under :root (light) and .dark.
 Each token becomes a Display P3 colour, the same values the iOS colour sets
 hold, so both apps draw the same colour. Tokens iOS pins keep the iOS value.
 
-    python3 tools/sync_theme.py [path/to/app.css] [path/to/Theme.xcassets]
+    python3 tools/sync_theme.py [--check] [path/to/app.css] [path/to/Theme.xcassets]
+
+With --check it writes nothing and exits 1 when KhepriColors.kt differs from what
+it would generate (a hand edit, or a web theme change not yet synced).
 """
 
 import json
@@ -34,6 +37,7 @@ TOKENS = {
     "muted-foreground": "MutedForeground",
     "destructive": "Destructive",
     "border": "Border",
+    "input": "Input",
     "ring": "Ring",
     "north-signal": "Signal",
     "north-agent": "Agent",
@@ -130,8 +134,10 @@ def property_name(name: str) -> str:
 
 
 def main() -> None:
-    css_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_CSS
-    ios_path = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_IOS
+    args = [a for a in sys.argv[1:] if a != "--check"]
+    check = "--check" in sys.argv[1:]
+    css_path = Path(args[0]) if len(args) > 0 else DEFAULT_CSS
+    ios_path = Path(args[1]) if len(args) > 1 else DEFAULT_IOS
     css = css_path.read_text()
     light, dark = block(css, ":root"), block(css, ".dark")
 
@@ -177,8 +183,15 @@ def main() -> None:
         "    Color(red, green, blue, alpha, ColorSpaces.DisplayP3)",
         "",
     ]
+    generated = "\n".join(lines)
+    if check:
+        current = OUT.read_text() if OUT.exists() else ""
+        if current != generated:
+            sys.exit(f"{OUT.relative_to(ROOT)} is out of date: run tools/sync_theme.py")
+        print("KhepriColors.kt is up to date")
+        return
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines))
+    OUT.write_text(generated)
     print(f"wrote {len(values)} tokens from {css_path.name} to {OUT.relative_to(ROOT)}")
 
 

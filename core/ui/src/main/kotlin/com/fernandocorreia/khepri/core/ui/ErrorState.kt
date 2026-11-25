@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,7 +29,7 @@ import com.fernandocorreia.khepri.core.model.AppError
 public fun ErrorState(error: AppError, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     val offline = error is AppError.Network
     Column(
-        modifier = modifier.fillMaxSize().padding(KhepriTheme.spacing.xxl),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(KhepriTheme.spacing.xxl),
         verticalArrangement = Arrangement.spacedBy(KhepriTheme.spacing.md, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -59,7 +61,7 @@ private fun AppError.serverMessage(): String? =
         is AppError.NotFound -> message
         is AppError.Refused -> message
         else -> null
-    }
+    }?.takeIf { it.isNotBlank() }
 
 @Preview
 @Composable

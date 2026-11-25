@@ -15,6 +15,8 @@ private val LocalSpacing = staticCompositionLocalOf { Spacing() }
 private val LocalRadii = staticCompositionLocalOf { Radii() }
 private val LocalTextStyles = staticCompositionLocalOf { KhepriTextStyles() }
 private val typography = geistTypography()
+private val lightScheme = KhepriColors.Light.scheme(dark = false)
+private val darkScheme = KhepriColors.Dark.scheme(dark = true)
 
 /**
  * The app theme: the web tokens as a Material 3 scheme, Geist everywhere, no dynamic colour. Controls tint with
@@ -31,7 +33,11 @@ public fun KhepriTheme(appearance: Appearance = Appearance.System, content: @Com
     val colors = if (dark) KhepriColors.Dark else KhepriColors.Light
     val radii = Radii()
     CompositionLocalProvider(LocalColors provides colors, LocalRadii provides radii) {
-        MaterialTheme(colorScheme = colors.scheme(dark), typography = typography, shapes = radii.materialShapes()) {
+        MaterialTheme(
+            colorScheme = if (dark) darkScheme else lightScheme,
+            typography = typography,
+            shapes = radii.materialShapes(),
+        ) {
             content()
         }
     }
@@ -52,24 +58,39 @@ public object KhepriTheme {
         @Composable @ReadOnlyComposable get() = LocalTextStyles.current
 }
 
+/**
+ * Every slot is mapped, so no default Material component (Snackbar, tonal Surface, pickers) falls back to the baseline
+ * purple. Field and button edges use `input`, the web's 3:1 control border; `border` and `hairline` are for dividers
+ * and cards only.
+ */
 internal fun KhepriColors.scheme(dark: Boolean): ColorScheme {
     val base = if (dark) darkColorScheme() else lightColorScheme()
+    val other = if (dark) KhepriColors.Light else KhepriColors.Dark
     return base.copy(
         primary = signal,
         onPrimary = primaryForeground,
         primaryContainer = secondary,
         onPrimaryContainer = secondaryForeground,
+        inversePrimary = other.signal,
         secondary = primary,
         onSecondary = primaryForeground,
         secondaryContainer = secondary,
         onSecondaryContainer = secondaryForeground,
         tertiary = agent,
+        onTertiary = primaryForeground,
+        tertiaryContainer = secondary,
+        onTertiaryContainer = secondaryForeground,
         background = background,
         onBackground = foreground,
         surface = background,
         onSurface = foreground,
         surfaceVariant = muted,
         onSurfaceVariant = mutedForeground,
+        surfaceTint = signal,
+        inverseSurface = foreground,
+        inverseOnSurface = background,
+        surfaceDim = background,
+        surfaceBright = card,
         surfaceContainerLowest = background,
         surfaceContainerLow = card,
         surfaceContainer = card,
@@ -77,7 +98,10 @@ internal fun KhepriColors.scheme(dark: Boolean): ColorScheme {
         surfaceContainerHighest = muted,
         error = destructive,
         onError = primaryForeground,
-        outline = border,
-        outlineVariant = hairline,
+        errorContainer = muted,
+        onErrorContainer = destructive,
+        outline = input,
+        outlineVariant = border,
+        scrim = foreground,
     )
 }
