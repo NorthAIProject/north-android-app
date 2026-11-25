@@ -6,12 +6,15 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 
 class AndroidLibraryPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("com.android.library")
-        extensions.configure<LibraryExtension> {
-            configureAndroid()
-            namespace = "com.fernandocorreia.khepri" + path.replace(':', '.')
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("com.android.library")
+            pluginManager.apply("khepri.quality")
+            extensions.configure<LibraryExtension> {
+                configureAndroid()
+                lint { configureLint(target) }
+                namespace = "com.fernandocorreia.khepri" + path.replace(':', '.')
+            }
+            configureKotlin()
         }
-        configureKotlin()
-    }
 }

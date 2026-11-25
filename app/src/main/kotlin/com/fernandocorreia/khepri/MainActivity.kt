@@ -36,6 +36,4 @@ internal fun AppRoot() {
     }
 }
 
-@Preview
-@Composable
-private fun AppRootPreview() = AppRoot()
+@Preview @Composable private fun AppRootPreview() = AppRoot()

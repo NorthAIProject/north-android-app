@@ -1,6 +1,7 @@
 package com.fernandocorreia.khepri.buildlogic
 
 import com.android.build.api.dsl.CommonExtension
+import com.android.build.api.dsl.Lint
 import org.gradle.api.Project
 import org.gradle.api.artifacts.MinimalExternalModuleDependency
 import org.gradle.api.artifacts.VersionCatalog
@@ -23,6 +24,19 @@ internal fun CommonExtension.configureAndroid() {
     compileSdk { version = release(TARGET_SDK) { minorApiLevel = 1 } }
     defaultConfig.minSdk = MIN_SDK
     testOptions.unitTests.isIncludeAndroidResources = true
+}
+
+/**
+ * Lint warnings are errors, with no baseline. Test sources are skipped: lint 9.5 crashes analysing Kotlin 2.4 test
+ * sources (FIR resolve error), and tests are not shipped.
+ */
+internal fun Lint.configureLint(project: Project) {
+    warningsAsErrors = true
+    abortOnError = true
+    checkDependencies = false
+    ignoreTestSources = true
+    error += setOf("MissingTranslation", "ContentDescription", "UnusedResources")
+    lintConfig = project.rootProject.file("config/lint/lint.xml")
 }
 
 internal fun Project.configureKotlin() {

@@ -105,16 +105,25 @@ Done 2026-11-25. Deviations: `khepri.room` is added in Phase 2 with `:core:datab
 **Interfaces:**
 - Produces: `./gradlew check` runs `spotlessCheck`, `detekt`, `lint`, `assertModuleGraph`, `buildHealth`, unit tests.
 
-- [ ] **Step 1:** Spotless with ktfmt (Kotlin style, width 120) for `*.kt` and `*.kts`; excludes `**/build/**`.
-- [ ] **Step 2:** detekt with the Compose rules plugin; no formatting rule set; `warningsAsErrors`; long method warn 100 / error 200; cyclomatic complexity ignores simple `when`; forbid `!!`.
-- [ ] **Step 3:** Lint: `warningsAsErrors`, `abortOnError`, no baseline; `MissingTranslation`, `ContentDescription` as errors. `UnusedResources` is an error, except that it ignores the generated `strings.xml` in `:core:ui` until Phase 6.
-- [ ] **Step 4:** `NoHardcodedUiText`: lint's `HardcodedText` covers XML only and this app has none, so a detekt rule fails on a string literal passed as `text` to `Text`, or as `contentDescription` or `label` anywhere. Previews (`@Preview`) and test sources are exempt. Use an equivalent rule from the Compose rules plugin if the installed version has one. Tests: a literal in `Text("Hi")` is reported; `Text(stringResource(R.string.x))` is not; a literal inside a `@Preview` function is not.
-- [ ] **Step 5:** Module-graph assertion over the transitive graph, with the rules in `docs/design.md` 6.1: feature domain sees only model and common; feature ui never reaches `:core:api`, `:core:network`, `:core:session` or any `data` module; no feature reaches another feature; only `:app` depends on `data`; core-to-core edges as in the table.
-- [ ] **Step 6:** Prove each gate bites, on a throwaway branch that is deleted afterwards: an unformatted line; a `!!`; `Text("Hi")`; a string present in `values` but missing from `values-es`; two temporary modules `:feature:a:ui` and `:feature:b:ui` with an edge between them. Confirm `./gradlew check` fails for each.
-- [ ] **Step 7:** `ci.yml`: on push and PR, JDK setup, Gradle cache, `./gradlew check :app:assembleRelease`. Generation reads only committed files, so CI needs no sibling repo.
-- [ ] **Step 8:** `.githooks/pre-commit` runs `spotlessApply` on staged Kotlin files and `detekt` on changed modules; add `git config core.hooksPath .githooks` to the repo `README.md`.
-- [ ] **Step 9:** PR template checklist: backend deployed first; strings in four locales; screenshots updated; parity checklist rows ticked; `syncContract --check` run.
-- [ ] **Step 10:** Run `./gradlew check`. Expected: BUILD SUCCESSFUL. Commit.
+- [x] **Step 1:** Spotless with ktfmt (Kotlin style, width 120) for `*.kt` and `*.kts`; excludes `**/build/**`.
+- [x] **Step 2:** detekt with the Compose rules plugin; no formatting rule set; `warningsAsErrors`; long method warn 100 / error 200; cyclomatic complexity ignores simple `when`; forbid `!!`.
+- [x] **Step 3:** Lint: `warningsAsErrors`, `abortOnError`, no baseline; `MissingTranslation`, `ContentDescription` as errors. `UnusedResources` is an error, except that it ignores the generated `strings.xml` in `:core:ui` until Phase 6.
+- [x] **Step 4:** `NoHardcodedUiText`: lint's `HardcodedText` covers XML only and this app has none, so a detekt rule fails on a string literal passed as `text` to `Text`, or as `contentDescription` or `label` anywhere. Previews (`@Preview`) and test sources are exempt. Use an equivalent rule from the Compose rules plugin if the installed version has one. Tests: a literal in `Text("Hi")` is reported; `Text(stringResource(R.string.x))` is not; a literal inside a `@Preview` function is not.
+- [x] **Step 5:** Module-graph assertion over the transitive graph, with the rules in `docs/design.md` 6.1: feature domain sees only model and common; feature ui never reaches `:core:api`, `:core:network`, `:core:session` or any `data` module; no feature reaches another feature; only `:app` depends on `data`; core-to-core edges as in the table.
+- [x] **Step 6:** Prove each gate bites, on a throwaway branch that is deleted afterwards: an unformatted line; a `!!`; `Text("Hi")`; a string present in `values` but missing from `values-es`; two temporary modules `:feature:a:ui` and `:feature:b:ui` with an edge between them. Confirm `./gradlew check` fails for each.
+- [x] **Step 7:** `ci.yml`: on push and PR, JDK setup, Gradle cache, `./gradlew check :app:assembleRelease`. Generation reads only committed files, so CI needs no sibling repo.
+- [x] **Step 8:** `.githooks/pre-commit` runs `spotlessApply` on staged Kotlin files and `detekt` on changed modules; add `git config core.hooksPath .githooks` to the repo `README.md`.
+- [x] **Step 9:** PR template checklist: backend deployed first; strings in four locales; screenshots updated; parity checklist rows ticked; `syncContract --check` run.
+- [x] **Step 10:** Run `./gradlew check`. Expected: BUILD SUCCESSFUL. Commit.
+
+Done 2026-11-25. Deviations:
+- detekt is 2.0.0-alpha.6 (owner's choice; compose-rules 0.6.8 needs it). Its `UnsafeCallOnNullableType` needs type resolution, which the `detekt` task does not run, so `!!` is caught by our own `NoNotNullAssertion` rule.
+- `assertModuleGraph` is our own task (`ModuleGraphPlugin`): an allowlist of `from -> to` patterns with back-references, plus a transitive check that no `feature:x:ui` reaches `data`, `:core:api`, `:core:network` or `:core:session`. The jraska plugin was approved but is not used.
+- Lint skips test sources: lint 9.5 crashes on Kotlin 2.4 test files (FIR resolve error). Re-check when AGP updates.
+- Lint required a launcher icon. A placeholder adaptive icon (Solar Gold disc on Armor Navy) stands in until the brand emblem is exported for Android.
+- Gates were proven in the working tree and reverted, not on a branch. Each of the five violations failed `check`.
+- detekt keeps its rule set loaded in the Gradle daemon: after changing `build-logic/detekt-rules`, run `./gradlew --stop`.
+- Open design conflict for the phase that adds speech: design 6.1 lets `feature:x:ui` use `:core:speech`, but `:core:speech` depends on `:core:network`, which `ui` must never reach. The transitive check will fail on that edge; decide then (likely a speech facade in `:core:ui`-level API, or `ui` → domain use case only).
 
 ### Task 3: `:core:model` and `:core:common`
 

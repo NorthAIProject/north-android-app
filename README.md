@@ -2,7 +2,15 @@
 
 Native Android client for Khepri (North), with the same features and behaviour as the iOS app in `../north-ios-app/khepri`, on the same backend (`../north-client`).
 
-**Status:** scaffold only. There is no Gradle project and no Kotlin yet. The module folders are empty placeholders; Phase 1 creates the build.
+**Status:** Phase 1 (foundation) in progress. The app builds and shows its name; features come in later phases.
+
+## Setup
+
+- JDK 21 (`JAVA_HOME`) and the Android SDK (`ANDROID_HOME`) with `platforms;android-37.1` installed.
+- Enable the pre-commit hook once per clone: `git config core.hooksPath .githooks`. It formats staged Kotlin files and runs detekt on their modules.
+- `./gradlew check` runs formatting, detekt, Android Lint, the module-graph assertion, `buildHealth` and unit tests.
+- After changing a rule in `build-logic/detekt-rules`, run `./gradlew --stop`: the daemon keeps the old rules loaded.
+- `./gradlew :app:assembleDebug` builds the app against a local backend on `10.0.2.2:8090`.
 
 ## Start here
 

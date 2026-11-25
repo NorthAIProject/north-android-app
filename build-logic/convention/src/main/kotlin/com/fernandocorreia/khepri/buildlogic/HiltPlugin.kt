@@ -5,14 +5,15 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
 
 class HiltPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("com.google.devtools.ksp")
-        pluginManager.apply("com.google.dagger.hilt.android")
-        dependencies {
-            add("implementation", lib("hilt-android"))
-            add("ksp", lib("hilt-compiler"))
-            add("testImplementation", lib("hilt-android-testing"))
-            add("kspTest", lib("hilt-compiler"))
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("com.google.devtools.ksp")
+            pluginManager.apply("com.google.dagger.hilt.android")
+            dependencies {
+                add("implementation", lib("hilt-android"))
+                add("ksp", lib("hilt-compiler"))
+                add("testImplementation", lib("hilt-android-testing"))
+                add("kspTest", lib("hilt-compiler"))
+            }
         }
-    }
 }

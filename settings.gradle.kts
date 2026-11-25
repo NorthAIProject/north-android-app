@@ -18,3 +18,7 @@ dependencyResolutionManagement {
 rootProject.name = "khepri"
 
 include(":app")
+
+include(":detekt-rules")
+
+project(":detekt-rules").projectDir = file("build-logic/detekt-rules")

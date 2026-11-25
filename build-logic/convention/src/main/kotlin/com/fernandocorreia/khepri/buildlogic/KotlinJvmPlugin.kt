@@ -7,14 +7,16 @@ import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.withType
 
 class KotlinJvmPlugin : Plugin<Project> {
-    override fun apply(target: Project) = with(target) {
-        pluginManager.apply("org.jetbrains.kotlin.jvm")
-        configureKotlin()
-        dependencies {
-            add("testImplementation", platform(lib("junit-bom")))
-            add("testImplementation", lib("junit-jupiter"))
-            add("testRuntimeOnly", lib("junit-platform-launcher"))
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("org.jetbrains.kotlin.jvm")
+            pluginManager.apply("khepri.quality")
+            configureKotlin()
+            dependencies {
+                add("testImplementation", platform(lib("junit-bom")))
+                add("testImplementation", lib("junit-jupiter"))
+                add("testRuntimeOnly", lib("junit-platform-launcher"))
+            }
+            tasks.withType<Test>().configureEach { useJUnitPlatform() }
         }
-        tasks.withType<Test>().configureEach { useJUnitPlatform() }
-    }
 }
