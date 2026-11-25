@@ -15,7 +15,10 @@ val contractDir = rootProject.layout.projectDirectory.dir("contract")
 val normalizedSpec = layout.buildDirectory.file("normalized/openapi.yaml")
 val generatedDir = layout.buildDirectory.dir("generated/openapi")
 
-/** Operations the generator must not see: event streams are hand-written, multipart is hand-written. */
+/**
+ * Operations the generator must not see: event streams and multipart are hand-written. These three stream without
+ * declaring `text/event-stream`; any operation that declares it is excluded too.
+ */
 val excludedOperations = setOf("replyInConversation", "resumeConversation", "streamCrewLive")
 
 val normalizeSpec by tasks.registering {
@@ -40,9 +43,13 @@ val normalizeSpec by tasks.registering {
                 val op = item.get(m) as? ObjectNode ?: return@forEach
                 val id = op.path("operationId").asText()
                 val multipart = op.path("requestBody").path("content").has("multipart/form-data")
-                if (id in excludedOperations || multipart) {
+                val stream = op.path("responses").fields().asSequence().any { it.value.path("content").has("text/event-stream") }
+                if (id in excludedOperations || multipart || stream) {
                     item.remove(m)
-                    removed += "$id${if (multipart) " (multipart)" else ""}"
+                    removed += "$id${if (multipart) " (multipart)" else if (stream) " (stream)" else ""}"
+                } else {
+                    // Android owns the interface grouping: one interface per first path segment, whatever the backend tags.
+                    op.putArray("tags").add(path.trim('/').substringBefore('/').ifEmpty { "root" })
                 }
             }
             if (methods.none { item.has(it) }) paths.remove(path)
@@ -70,6 +77,8 @@ val normalizeSpec by tasks.registering {
                     } else if (node.get("type")?.isTextual == true) {
                         val t = node.get("type").asText()
                         node.putArray("type").add(t).add("null")
+                    } else {
+                        throw GradleException("normalizeSpec: unhandled nullable shape: $node")
                     }
                     rewritten++
                 }
@@ -150,5 +159,12 @@ tasks.test {
     useJUnitPlatform()
     systemProperty("contract.dir", contractDir.asFile.absolutePath)
     systemProperty("normalized.spec", normalizedSpec.get().asFile.absolutePath)
+    systemProperty(
+        "generated.endpoints",
+        generatedDir.get().dir("src/main/kotlin/com/fernandocorreia/khepri/core/api/endpoint").asFile.absolutePath,
+    )
+    // Goldens and the spec are read at test time; declare them so a changed golden reruns the tests.
+    inputs.dir(contractDir)
+    inputs.file(normalizedSpec)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

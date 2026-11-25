@@ -145,6 +145,9 @@ check("back dismisses the sheet", on_screen("More root") and not on_screen("Sett
 tab("Training")
 tap_text("Start workout")
 check("full-screen workout hides tab bar", on_screen("Workout (full screen)") and not on_screen("Progress"), texts())
+tap_text("Sheet over workout")
+check("sheet over workout keeps tab bar hidden", on_screen("Settings (sheet)") and not on_screen("Progress"), texts())
+back()
 back()
 check("tab bar back after leaving workout", on_screen("Training root") and on_screen("Progress"), texts())
 
@@ -191,6 +194,23 @@ check("after process death: More stack restored", on_screen("Goal g1"), title())
 back()
 back()
 check("after process death: More root note restored", on_screen("kept"), texts())
+
+# 6b. A link that arrives after process death (the push-tap path) lands, and the other stacks are restored.
+tab("Coach")
+adb("shell", "input", "keyevent", "KEYCODE_HOME")
+time.sleep(1.5)
+for _ in range(20):
+    adb("shell", "am", "kill", PKG)
+    time.sleep(1)
+    if not adb("shell", "pidof", PKG).strip():
+        break
+check("process was killed again", not adb("shell", "pidof", PKG).strip())
+launch("khepri://goals/g7")
+check("link after process death: Goal g7 on More", on_screen("Goal g7"), title())
+tab("Coach")
+check("link after process death: Coach stack still restored", on_screen("Coach detail 1"), title())
+back()
+back()
 
 # 7. Back from Today root exits.
 tab("Today")

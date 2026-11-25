@@ -15,6 +15,13 @@ android {
         versionName = "s9"
     }
     buildFeatures { compose = true }
+    buildTypes {
+        release {
+            // R8 full mode, as the product app will ship; signed with the debug key so the spike can be installed.
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
 }
 
 kotlin { jvmToolchain(21) }

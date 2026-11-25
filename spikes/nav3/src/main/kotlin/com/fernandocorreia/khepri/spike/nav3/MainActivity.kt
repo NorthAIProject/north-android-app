@@ -75,7 +75,6 @@ fun SpikeApp(pendingLink: MutableState<String?>, onExit: () -> Unit) {
     }
 
     val current = stacks.getValue(selected)
-    val top = current.last() as Route
     // One NavDisplay per tab; the tab's whole subtree (entry state included) is saved when it is not selected.
     val tabStates = rememberSaveableStateHolder()
     // Each tab's entry ViewModels live in a store that outlives the tab leaving composition.
@@ -83,7 +82,7 @@ fun SpikeApp(pendingLink: MutableState<String?>, onExit: () -> Unit) {
 
     Scaffold(
         bottomBar = {
-            if (!top.hidesTabBar()) {
+            if (!current.filterIsInstance<Route>().hidesTabBar()) {
                 NavigationBar {
                     Tab.entries.forEach { tab ->
                         NavigationBarItem(
@@ -149,7 +148,7 @@ fun SpikeApp(pendingLink: MutableState<String?>, onExit: () -> Unit) {
                     entry<SettingsSheet>(metadata = BottomSheetSceneStrategy.bottomSheet()) {
                         Screen("Settings (sheet)") {}
                     }
-                    entry<Workout> { Screen("Workout (full screen)") {} }
+                    entry<Workout> { Screen("Workout (full screen)") { Button(onClick = { current.add(SettingsSheet) }) { Text("Sheet over workout") } } }
                     entry<Thread> { key -> Screen("Thread ${key.id} (no tab bar)") {} }
                 },
         )

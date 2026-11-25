@@ -46,7 +46,7 @@ Everything is in `spikes/client/build.gradle.kts` and `spikes/client/src/`.
 
 ## Result
 
-**Pass.** 159 of 159 tests pass.
+**Pass.** 159 of 159 tests pass in the first run; 178 after the review fixes below.
 
 - **Builds:** 575 models, 0 compiler errors.
 - **Nullability:** all 6 nullable sites are nullable Kotlin properties: the 3 above, plus `TargetWeight.targetWeightKg`, `HelpfulRequest.helpful` and `ReportHelpfulRequest.helpful`.
@@ -60,25 +60,24 @@ Everything is in `spikes/client/build.gradle.kts` and `spikes/client/src/`.
   - An undeclared key fails the key check.
   - A missing required field fails the schema validator. This proves the validator actually catches errors.
 
-**Interface grouping:** tagged operations go to one interface per tag:
+**Interface grouping.** The spec tags only 127 of 390 operations; the first run put the other 254 in one `DefaultApi`. `normalizeSpec` now ignores the spec's tags and tags each operation with the first segment of its path (`/training/week` → `training`, `/` → `root`). Android owns this grouping, so a backend tag change cannot move call sites. The result is 68 interfaces with 378 operations; the largest:
 
 | Interface | Operations |
 |---|---|
-| `AwardsApi` | 4 |
+| `NutritionApi` | 29 |
+| `SettingsApi` | 28 |
 | `CrewsApi` | 27 |
-| `DailyApi` | 3 |
-| `DashboardApi` | 2 |
-| `InboxApi` | 4 |
-| `ModerationApi` | 5 |
-| `NewsApi` | 4 |
-| `PushApi` | 3 |
-| `RecapApi` | 2 |
-| `SettingsApi` | 27 |
-| `SocialApi` | 34 |
-| `TrainingApi` | 7 |
-| `WeeklyApi` | 2 |
+| `TrainingApi` | 19 |
+| `AuthApi` | 17 |
+| `InsightsApi` | 17 |
+| `SocialApi` | 16 |
+| `GoalsApi` | 11 |
 
-The 254 untagged operations are in `DefaultApi`, and that includes `getMe` and `logOut`. All functions are `suspend` and return `Response<T>`.
+`getMe` is in `MeApi` and `logOut` in `AuthApi`. All functions are `suspend` and return `Response<T>`.
+
+**Query and path values (found in review).** Retrofit turns `@Query` and `@Path` arguments into text with `toString()`. Generated enums do not override it, so `getTrainingWeek(week = NEXT)` sent `?week=NEXT`, and the server compares against `next` (`internal/workouts/week_api.go`) and silently used this week. `QueryValueConverterFactory` supplies a `stringConverter` that writes enums, `Instant` and `LocalDate` with the same serializer as JSON bodies. `QueryValueTest` covers `?week=next`, the `Instant` format and all 9 query and path enums. 178 of 178 tests pass.
+
+**Event streams.** The exclusion step now also drops any operation whose response declares `text/event-stream`, besides the named ones. `normalizeSpec` fails the build on a nullable shape it does not know, and the test task declares the contract and normalised spec as inputs, so a golden change reruns the tests.
 
 ## Decision
 
@@ -88,7 +87,8 @@ Rules for the code that wraps the generated client:
 
 - Never use the generated `infrastructure.Serializer.kotlinxSerializationJson`. It sets `encodeDefaults = true` and `ignoreUnknownKeys = true`.
 - Never send `UNKNOWN` back to the server. Its wire value is `unknown_default_open_api`, and the server rejects it. For example, `DecisionInputDto.Held` is a request enum.
-- `DefaultApi` is the only interface large enough to matter. The `:data` modules call it through `:core:api`, and per-feature facades are optional.
+- Register `QueryValueConverterFactory` on every Retrofit instance. Without it, enum query values go out in upper case.
+- Interfaces are grouped by path segment, not by spec tag. The `:data` modules call them through `:core:api`.
 
 ## Follow-ups
 

@@ -12,10 +12,36 @@
 
 **Depends on:** spikes S1 (generator options, interface grouping, enum member name, validator choice), S2 (the contract SHA) and S9 (navigation model). Dependency vetting needs the owner's Sonatype token, or the owner approving the dependency list by hand. Nothing else in Phase 0 blocks this plan.
 
+## Amendments after Phase 0 (review 2026-11-25)
+
+Phase 0 ended with a Fable review of the spikes. These items change the tasks below and win over older text in them.
+
+- **Task 1.** Before any feature code, prove Hilt + KSP + Robolectric + Roborazzi build and run one test each on AGP 9.5.2, Kotlin 2.4.21 and compileSdk 37.1. These dependencies need the owner's approval by hand (no Sonatype token). `compileSdk { version = release(37) { minorApiLevel = 1 } }`, `platforms;android-37.1` installed, `google()` in both repository blocks, and `org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g` (R8 ran the daemon out of Metaspace in S9).
+- **Task 4.**
+  - Use the S1 generator configuration and `normalizeSpec` as they are, including retagging by first path segment (expect 68 interfaces, 378 operations, 12 operations removed; assert these counts so a spec change is noticed). There is no `core/api/templates/` directory: S1 needed no template overrides.
+  - `uuid` maps to `String` (design 7.1), not `java.util.UUID` as the spike did. One malformed id must not fail a whole response, and links compare ids as text.
+  - `ApiJson.default` is the spike's `ApiJson.tolerant`.
+  - `UNKNOWN_ENUM = "UNKNOWN"` (set with `enumNameMappings`). Only model enums have it; the 9 endpoint (query and path) enums do not, so `EnumToleranceTest` lists the model package only.
+  - Encoding `UNKNOWN` must throw: its wire value `unknown_default_open_api` is rejected by the server.
+  - The `Instant`, `LocalDate` and UUID-format serializers throw `SerializationException`, never `DateTimeParseException` or `IllegalArgumentException`.
+  - `RequestSchemaTest` checks keys recursively through nested objects and arrays, builds a fully populated instance of every request DTO from its `SerialDescriptor`, and resolves the `HelpfulRequest.helpful` conflict (required and nullable). Add a required-fields-only decode for every response DTO.
+  - `normalizeSpec` fails on any unquoted YAML 1.1 boolean word used as a key (`on`, `off`, `yes`, `no`, `y`, `n`), and the free-form object rewrite also drops `additionalProperties: false`.
+  - `OperationIndexTask` reads the spec after the `on` quoting but before operations are removed, so the event-stream and multipart operations are indexed too.
+- **Task 5.** Register `QueryValueConverterFactory` (from S1) on the Retrofit instance; without it enum query values go out in upper case (`?week=NEXT`). `apiCall` maps `SerializationException` and `IllegalArgumentException` to `AppError.Decoding`.
+- **Task 7.** Sign-out clears every tab's `ViewModelStore` and resets every tab's stack before the login screen shows, so the next account never sees the last one's screens.
+- **Task 9.**
+  - A `NavigationState` holder lives above the phase switch in `RootContent`, owns the per-tab back stacks and the per-tab `ViewModelStoreProvider`s (S9), and survives phase changes.
+  - `Navigator` exposes `open`, `push`, `pop` and `popToRoot`, applied through a command queue so a link that arrives before the shell is composed is not lost.
+  - When `open` replaces a stack, it calls `provider.clearKey(contentKey)` for each removed entry.
+  - Prove a Hilt ViewModel with an assisted route key and a `SavedStateHandle` under the per-tab provider, including process death.
+  - Consume a link once: clear `intent.data` with `setIntent` after `Navigator` takes it.
+  - Evaluate Navigation 3 `runtime.deeplink` and `ResultEffect` before writing our own. Re-selecting a tab also reloads its root.
+- **Task 12.** Test what was not proven in S9: sheet swipe-dismiss, a sheet restored after process death, predictive back, a minSdk 28 emulator, and an R8 release run of the process-death check. Decide what a push link does while a workout is active (recommended: hold it until the workout ends).
+
 ## Global Constraints
 
 - Application id `com.fernandocorreia.khepri`; debug suffix `.debug`. `:app` namespace `com.fernandocorreia.khepri`; other modules `com.fernandocorreia.khepri.<module path with dots>` (`:core:network` → `com.fernandocorreia.khepri.core.network`).
-- minSdk 28; targetSdk and compileSdk are the current stable level.
+- minSdk 28; targetSdk 37; compileSdk 37.1 (Compose 1.13 needs the minor level).
 - Debug API base `http://10.0.2.2:8090`, release `https://kheprios.com`; the client appends `/api/v1/`. Cleartext is allowed for `10.0.2.2` only.
 - Time types are `java.time` everywhere.
 - Every version lives in `gradle/libs.versions.toml`. Use the versions recorded in the spike results; look up the current stable version for anything else.
@@ -157,7 +183,7 @@ class TokenUnreadableException(cause: Throwable? = null) : java.io.IOException(c
 - Create: `core/api/contract/openapi.yaml`, `core/api/contract/medals.json`, `core/api/contract/golden/**` (written by `syncContract`, **committed**)
 - Create: `build-logic/convention/src/main/kotlin/…/SyncContractTask.kt` (registers `syncContract`, with `--check`)
 - Create: `build-logic/convention/src/main/kotlin/…/OperationIndexTask.kt` (generates `OperationIndex.kt` from the spec)
-- Create: `core/api/templates/`, `core/api/normalize-spec.*` (from S1)
+- Create: `core/api/normalize-spec.*` (from S1; no template overrides)
 - Create: `core/api/src/main/kotlin/com/fernandocorreia/khepri/core/api/FlexibleInstantSerializer.kt`, `ApiJson.kt`, `GoldenMap.kt`
 - Test: `core/api/src/test/kotlin/…/FlexibleInstantSerializerTest.kt`, `EnumToleranceTest.kt`, `GoldenContractTest.kt`, `RequestSchemaTest.kt`, `OperationIndexTest.kt`
 
@@ -167,7 +193,7 @@ class TokenUnreadableException(cause: Throwable? = null) : java.io.IOException(c
   - Generated models in `com.fernandocorreia.khepri.core.api.model`, all suffixed `Dto` (`TodayResponseDto`, `OutcomeDto`); Retrofit interfaces in `com.fernandocorreia.khepri.core.api`, every method `suspend` and returning `retrofit2.Response<T>`.
   - `object ApiJson { val default: Json; val strict: Json }`: `default` has `ignoreUnknownKeys = true`, `explicitNulls = false`, `encodeDefaults = false`; `strict` is the same with `ignoreUnknownKeys = false`.
   - `data class OperationEntry(val method: String, val pathTemplate: String, val operationId: String, val isPublic: Boolean, val isLong: Boolean)` and `object OperationIndex { val entries: List<OperationEntry>; fun find(method: String, path: String): OperationEntry? }`. `path` is the request path without `/api/v1`; templates match one path segment per `{param}`. `isPublic` = spec `security: []` except `logOut`. `isLong` = the eight operations in `docs/design.md` 7.3.
-  - `const val UNKNOWN_ENUM = "<member name recorded in S1>"`. If S1 renamed the member to `UNKNOWN` with a template, this is `"UNKNOWN"`.
+  - `const val UNKNOWN_ENUM = "UNKNOWN"` (S1: `enumNameMappings`, no template).
 
 - [ ] **Step 1:** `syncContract` reads `contract.sha` and, using `git -C ../north-client show <sha>:<path>`, writes `docs/api/openapi.yaml`, `docs/medals/medals.json` and every file matching `internal/*/testdata/*.golden.json` (all packages, not the iOS subset) into `core/api/contract/`. `--check` fails if any committed copy differs or is missing. It never reads the `north-client` working tree.
 - [ ] **Step 2:** Write `FlexibleInstantSerializerTest` (`java.time.Instant`):
@@ -182,7 +208,7 @@ class TokenUnreadableException(cause: Throwable? = null) : java.io.IOException(c
 ```
 
 - [ ] **Step 3:** Run; expect failure. Implement with `DateTimeFormatter.ISO_OFFSET_DATE_TIME` for reading. Run; expect PASS.
-- [ ] **Step 4:** Wire generation from `core/api/contract/openapi.yaml`: normalise (both nullable forms), generate with model suffix `Dto`, exclude `replyInConversation`, `resumeConversation`, `streamCrewLive` and the 9 multipart operations; map `uuid` → `String`, `date-time` → `Instant` with the serializer, `date` → `LocalDate`. Output under `build/`; excluded from Spotless, detekt and explicit API.
+- [ ] **Step 4:** Wire generation from `core/api/contract/openapi.yaml`: normalise (both nullable forms), generate with model suffix `Dto`, exclude `replyInConversation`, `resumeConversation`, every operation whose response declares `text/event-stream` and the 9 multipart operations; retag by first path segment; map `uuid` → `String`, `date-time` → `Instant` with the serializer, `date` → `LocalDate`. Output under `build/`; excluded from Spotless, detekt and explicit API.
 - [ ] **Step 5:** `EnumToleranceTest`: reflectively list every generated enum; assert each has a member named `UNKNOWN_ENUM`; decode `"definitely-not-a-value"` into one enum-typed field of a real response DTO and assert that member.
 - [ ] **Step 6:** `GoldenMap.kt`: golden file name → serializer, built from the mapping in `K/NorthKit/Tests/NorthAPITests/ContractTests.swift`, extended for the files iOS does not cover. `GoldenContractTest`: decode each committed golden file with `ApiJson.strict`; fail if a file in `contract/golden/` has no entry, or an entry has no file.
 - [ ] **Step 7:** `RequestSchemaTest`: for every generated request DTO, serialise a fully populated instance with `ApiJson.default`; fail on any key that is not a declared property of its schema in the spec (resolving `$ref` and `allOf`); then validate the JSON against the schema with the validator from S1. Also serialise one with optional fields null and assert no `null` values appear.

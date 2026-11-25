@@ -53,7 +53,7 @@ The shape that passed:
 
 ## Result
 
-**Pass.** 28/28 checks green on the emulator in the final run:
+**Pass.** 32/32 checks green on the emulator, on both the debug build and the R8-minified release build (`NavKey` state is restored through serialization, so R8 had to be proven):
 
 - five tabs, with separate stacks kept across switches;
 - back pops within a tab;
@@ -62,9 +62,11 @@ The shape that passed:
 - re-select pops to root;
 - the sheet shows over More root, and back dismisses it;
 - a full-screen entry hides the tab bar, and the bar comes back after leaving it;
+- a sheet over a full-screen entry keeps the tab bar hidden (the bar follows the top entry that is not a sheet);
 - back from a tab root returns to Today, and back at Today root leaves the app;
 - rotation keeps the stack and the ViewModel;
 - **process death** (`am kill` after HOME, `pidof` empty) restores the selected tab, both stacks and the saveable entry state;
+- a link that arrives after process death lands, and the other tabs keep their restored stacks;
 - a cold `khepri://goals/g42` builds More → Goals → Goal g42, and back walks up the parents and then to Today;
 - a warm `khepri://coach/t9` lands on the thread with the tab bar hidden;
 - the same link twice still lands.
@@ -76,6 +78,8 @@ Rerun with:
 adb install -r spikes/nav3/build/outputs/apk/debug/nav3-debug.apk
 python3 -I spikes/nav3/s9-check.py
 ```
+
+For the release build, run `:nav3:assembleRelease` and install `nav3-release.apk` (signed with the debug key). The spikes need `org.gradle.jvmargs=-Xmx4g` in `spikes/gradle.properties`, or R8 runs the daemon out of Metaspace.
 
 ## Decision
 
@@ -94,5 +98,6 @@ Navigation 3 1.2.2 stays. The Navigation Compose fallback is not needed. `:core:
   - Add `google()` to both repository blocks.
 - **`Navigator.open` cleanup.** When it replaces a stack that is not composed (another tab), the replaced entries never get `onPop`. Their ViewModels stay in that tab's provider until the activity dies. `Navigator` must call `provider.clearKey(entry.contentKey)` for each replaced key. That is a small leak, not a correctness bug, and it was not exercised by the spike.
 - **Link replay after force-stop.** A force-stop followed by a launcher start re-delivers the task's original VIEW intent with no saved state, so the old link is applied again. This is seen only after force-stop, never after process death. The `LAUNCHED_FROM_HISTORY` guard covers recents. Phase 1 should consume the link in `Navigator` and clear `intent.data` (`setIntent`). The force-stop case is accepted.
+- **Not proven yet (Phase 1):** swipe-dismiss of a sheet, a sheet restored after process death, predictive back, a minSdk 28 device, and what a push link does while a workout is active.
 - **design.md 8.2** now records the per-tab shape (done in this change).
 - The spike checks rely on uiautomator text. Phase 1 replaces them with Compose UI tests plus one instrumented process-death test (`ActivityScenario.recreate` cannot kill a process; use `am kill` from a test-orchestrator script, or `StateRestorationTester` for the saveable part).

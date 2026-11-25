@@ -25,7 +25,10 @@ enum class Tab { Today, Coach, Training, Progress, More }
 /** Coach thread: the tab bar is hidden. */
 @Serializable data class Thread(val id: String) : Route
 
-fun Route.hidesTabBar(): Boolean = this is Workout || this is Thread
+fun Route.isSheet(): Boolean = this is SettingsSheet
+
+/** Decided by the top entry that is not a sheet, so a sheet over a full-screen flow keeps the tab bar hidden. */
+fun List<Route>.hidesTabBar(): Boolean = lastOrNull { !it.isSheet() }.let { it is Workout || it is Thread }
 
 /**
  * Parses the spike's deep links into a tab and the stack to put on it, parents first.
