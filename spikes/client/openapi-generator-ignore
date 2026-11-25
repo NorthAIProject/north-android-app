@@ -1,0 +1,3 @@
+# The OkHttp/Retrofit setup and auth are hand-written (docs/design.md 7.2).
+**/infrastructure/ApiClient.kt
+**/auth/**
