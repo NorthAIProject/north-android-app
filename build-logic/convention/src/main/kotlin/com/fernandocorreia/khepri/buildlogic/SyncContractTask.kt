@@ -14,10 +14,10 @@ import org.gradle.api.tasks.options.Option
 import org.gradle.process.ExecOperations
 
 /**
- * Copies the API contract from `north-client` at the pinned commit into `contract/`: the spec, the medals file and every
- * `internal/<package>/testdata/<name>.golden.json` (as `golden/<name>.golden.json`; `profiles` goldens get a `profiles-`
- * prefix because `profile.golden.json` exists twice). Reads git objects with `git show`, never the working tree. With
- * `--check` it writes nothing and fails if any committed copy differs, is missing or is stale.
+ * Copies the API contract from `north-client` at the pinned commit into `contract/`: the spec, the medals file and
+ * every `internal/<package>/testdata/<name>.golden.json` (as `golden/<name>.golden.json`; `profiles` goldens get a
+ * `profiles-` prefix because `profile.golden.json` exists twice). Reads git objects with `git show`, never the working
+ * tree. With `--check` it writes nothing and fails if any committed copy differs, is missing or is stale.
  */
 abstract class SyncContractTask @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
     @get:Input abstract val sha: Property<String>
@@ -44,16 +44,19 @@ abstract class SyncContractTask @Inject constructor(private val exec: ExecOperat
                 .lines()
                 .mapNotNull { path -> destination(path)?.let { it to path } }
                 .toMap()
-        if (wanted.size != wanted.values.toSet().size) throw GradleException("syncContract: two sources map to one file")
+        if (wanted.size != wanted.values.toSet().size)
+            throw GradleException("syncContract: two sources map to one file")
         val root = contractDir.get().asFile
-        val present = root.walkTopDown().filter { it.isFile }.map { it.relativeTo(root).invariantSeparatorsPath }.toSet()
+        val present =
+            root.walkTopDown().filter { it.isFile }.map { it.relativeTo(root).invariantSeparatorsPath }.toSet()
         val stale = present - wanted.keys
         val problems = mutableListOf<String>()
         wanted.forEach { (dest, source) ->
             val bytes = git("show", "$commit:$source")
             val file = File(root, dest)
             if (checkOnly.get()) {
-                if (!file.exists()) problems += "missing $dest" else if (!file.readBytes().contentEquals(bytes)) problems += "differs $dest"
+                if (!file.exists()) problems += "missing $dest"
+                else if (!file.readBytes().contentEquals(bytes)) problems += "differs $dest"
             } else {
                 file.parentFile.mkdirs()
                 file.writeBytes(bytes)
@@ -61,7 +64,8 @@ abstract class SyncContractTask @Inject constructor(private val exec: ExecOperat
         }
         if (checkOnly.get()) {
             problems += stale.map { "stale $it" }
-            if (problems.isNotEmpty()) throw GradleException("Contract is not in sync with $commit:\n" + problems.joinToString("\n"))
+            if (problems.isNotEmpty())
+                throw GradleException("Contract is not in sync with $commit:\n" + problems.joinToString("\n"))
             logger.lifecycle("Contract matches $commit (${wanted.size} files)")
         } else {
             stale.forEach { File(root, it).delete() }

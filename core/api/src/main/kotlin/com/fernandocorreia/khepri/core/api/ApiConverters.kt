@@ -5,8 +5,11 @@ import java.time.Instant
 import java.time.LocalDate
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.serializer
@@ -30,9 +33,10 @@ object JsonConverterFactory : Converter.Factory() {
         methodAnnotations: Array<out Annotation>,
         retrofit: Retrofit,
     ): Converter<*, RequestBody> {
-        val serializer = ApiJson.default.serializersModule.serializer(type)
+        @Suppress("UNCHECKED_CAST")
+        val serializer = ApiJson.default.serializersModule.serializer(type) as KSerializer<Any?>
         return Converter<Any, RequestBody> { value ->
-            val element = ApiJson.default.encodeToJsonElement(serializer, value)
+            val element = encodeRequest(serializer, value)
             if (element.holdsUnknown()) throw SerializationException("Refusing to send $UNKNOWN_ENUM to the server")
             element.toString().toRequestBody(mediaType)
         }
@@ -44,8 +48,39 @@ object JsonConverterFactory : Converter.Factory() {
         retrofit: Retrofit,
     ): Converter<ResponseBody, *> {
         val serializer = ApiJson.default.serializersModule.serializer(type)
-        return Converter<ResponseBody, Any?> { body -> body.use { ApiJson.default.decodeFromString(serializer, it.string()) } }
+        return Converter<ResponseBody, Any?> { body ->
+            body.use { ApiJson.default.decodeFromString(serializer, it.string()) }
+        }
     }
+
+    /**
+     * Encodes without nulls, then puts back `null` for properties the spec marks required and nullable
+     * (`HelpfulRequest.helpful`: null clears the vote). An optional property that is null stays absent.
+     */
+    fun encodeRequest(serializer: KSerializer<Any?>, value: Any?): JsonElement =
+        ApiJson.default.encodeToJsonElement(serializer, value).withRequiredNulls(serializer.descriptor)
+
+    private fun JsonElement.withRequiredNulls(descriptor: SerialDescriptor): JsonElement =
+        when {
+            this is JsonObject && descriptor.kind == StructureKind.CLASS ->
+                JsonObject(
+                    buildMap {
+                        putAll(this@withRequiredNulls)
+                        for (i in 0 until descriptor.elementsCount) {
+                            val name = descriptor.getElementName(i)
+                            val child = descriptor.getElementDescriptor(i)
+                            val current = this@withRequiredNulls[name]
+                            when {
+                                current != null -> put(name, current.withRequiredNulls(child))
+                                !descriptor.isElementOptional(i) && child.isNullable -> put(name, JsonNull)
+                            }
+                        }
+                    }
+                )
+            this is JsonArray && descriptor.kind == StructureKind.LIST ->
+                JsonArray(map { it.withRequiredNulls(descriptor.getElementDescriptor(0)) })
+            else -> this
+        }
 
     private fun JsonElement.holdsUnknown(): Boolean =
         when (this) {
@@ -61,9 +96,16 @@ object JsonConverterFactory : Converter.Factory() {
  * are written in JSON bodies, and refuses `UNKNOWN`.
  */
 object QueryValueConverterFactory : Converter.Factory() {
-    override fun stringConverter(type: Type, annotations: Array<out Annotation>, retrofit: Retrofit): Converter<*, String>? {
-        val cls = type as? Class<*> ?: return null
-        if (!cls.isEnum && cls != Instant::class.java && cls != LocalDate::class.java) return null
+    private val textTypes = setOf<Class<*>>(Instant::class.java, LocalDate::class.java)
+
+    private fun isQueryValue(type: Type): Boolean = type is Class<*> && (type.isEnum || type in textTypes)
+
+    override fun stringConverter(
+        type: Type,
+        annotations: Array<out Annotation>,
+        retrofit: Retrofit,
+    ): Converter<*, String>? {
+        if (!isQueryValue(type)) return null
         @Suppress("UNCHECKED_CAST")
         val serializer = ApiJson.default.serializersModule.serializer(type) as KSerializer<Any>
         return Converter<Any, String> { value ->

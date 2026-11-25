@@ -209,8 +209,8 @@ Done 2026-11-25. Deviations: both modules are plain Kotlin with explicit API mod
   - `data class OperationEntry(val method: String, val pathTemplate: String, val operationId: String, val isPublic: Boolean, val isLong: Boolean)` and `object OperationIndex { val entries: List<OperationEntry>; fun find(method: String, path: String): OperationEntry? }`. `path` is the request path without `/api/v1`; templates match one path segment per `{param}`. `isPublic` = spec `security: []` except `logOut`. `isLong` = the eight operations in `docs/design.md` 7.3.
   - `const val UNKNOWN_ENUM = "UNKNOWN"` (S1: `enumNameMappings`, no template).
 
-- [ ] **Step 1:** `syncContract` reads `contract.sha` and, using `git -C ../north-client show <sha>:<path>`, writes `docs/api/openapi.yaml`, `docs/medals/medals.json` and every file matching `internal/*/testdata/*.golden.json` (all packages, not the iOS subset) into `core/api/contract/`. `--check` fails if any committed copy differs or is missing. It never reads the `north-client` working tree.
-- [ ] **Step 2:** Write `FlexibleInstantSerializerTest` (`java.time.Instant`):
+- [x] **Step 1:** `syncContract` reads `contract.sha` and, using `git -C ../north-client show <sha>:<path>`, writes `docs/api/openapi.yaml`, `docs/medals/medals.json` and every file matching `internal/*/testdata/*.golden.json` (all packages, not the iOS subset) into `core/api/contract/`. `--check` fails if any committed copy differs or is missing. It never reads the `north-client` working tree.
+- [x] **Step 2:** Write `FlexibleInstantSerializerTest` (`java.time.Instant`):
 
 ```kotlin
 @Test fun `reads whole seconds`() = assertEquals(Instant.parse("2026-09-24T07:15:00Z"), decode("\"2026-09-24T07:15:00Z\""))
@@ -221,13 +221,22 @@ Done 2026-11-25. Deviations: both modules are plain Kotlin with explicit API mod
 @Test fun `rejects a non-date`() { assertFailsWith<SerializationException> { decode("\"yesterday\"") } }
 ```
 
-- [ ] **Step 3:** Run; expect failure. Implement with `DateTimeFormatter.ISO_OFFSET_DATE_TIME` for reading. Run; expect PASS.
-- [ ] **Step 4:** Wire generation from `core/api/contract/openapi.yaml`: normalise (both nullable forms), generate with model suffix `Dto`, exclude `replyInConversation`, `resumeConversation`, every operation whose response declares `text/event-stream` and the 9 multipart operations; retag by first path segment; map `uuid` → `String`, `date-time` → `Instant` with the serializer, `date` → `LocalDate`. Output under `build/`; excluded from Spotless, detekt and explicit API.
-- [ ] **Step 5:** `EnumToleranceTest`: reflectively list every generated enum; assert each has a member named `UNKNOWN_ENUM`; decode `"definitely-not-a-value"` into one enum-typed field of a real response DTO and assert that member.
-- [ ] **Step 6:** `GoldenMap.kt`: golden file name → serializer, built from the mapping in `K/NorthKit/Tests/NorthAPITests/ContractTests.swift`, extended for the files iOS does not cover. `GoldenContractTest`: decode each committed golden file with `ApiJson.strict`; fail if a file in `contract/golden/` has no entry, or an entry has no file.
-- [ ] **Step 7:** `RequestSchemaTest`: for every generated request DTO, serialise a fully populated instance with `ApiJson.default`; fail on any key that is not a declared property of its schema in the spec (resolving `$ref` and `allOf`); then validate the JSON against the schema with the validator from S1. Also serialise one with optional fields null and assert no `null` values appear.
-- [ ] **Step 8:** `OperationIndexTest`: `find("POST", "/auth/login")?.isPublic == true`; `find("POST", "/auth/logout")?.isPublic == false`; the four passkey operations, `signUp`, `signInWithGoogle`, `signInWithApple`, `requestPasswordReset` are public; `find("GET", "/conversations/3f1c…")?.operationId == "getConversation"`; `find("POST", "/training/plans")?.isLong == true`; `find("GET", "/nope") == null`.
-- [ ] **Step 9:** `./gradlew syncContract --check :core:api:test`. Expected: PASS. Commit the contract copies with the code.
+- [x] **Step 3:** Run; expect failure. Implement with `DateTimeFormatter.ISO_OFFSET_DATE_TIME` for reading. Run; expect PASS.
+- [x] **Step 4:** Wire generation from `core/api/contract/openapi.yaml`: normalise (both nullable forms), generate with model suffix `Dto`, exclude `replyInConversation`, `resumeConversation`, every operation whose response declares `text/event-stream` and the 9 multipart operations; retag by first path segment; map `uuid` → `String`, `date-time` → `Instant` with the serializer, `date` → `LocalDate`. Output under `build/`; excluded from Spotless, detekt and explicit API.
+- [x] **Step 5:** `EnumToleranceTest`: reflectively list every generated enum; assert each has a member named `UNKNOWN_ENUM`; decode `"definitely-not-a-value"` into one enum-typed field of a real response DTO and assert that member.
+- [x] **Step 6:** `GoldenMap.kt`: golden file name → serializer, built from the mapping in `K/NorthKit/Tests/NorthAPITests/ContractTests.swift`, extended for the files iOS does not cover. `GoldenContractTest`: decode each committed golden file with `ApiJson.strict`; fail if a file in `contract/golden/` has no entry, or an entry has no file.
+- [x] **Step 7:** `RequestSchemaTest`: for every generated request DTO, serialise a fully populated instance with `ApiJson.default`; fail on any key that is not a declared property of its schema in the spec (resolving `$ref` and `allOf`); then validate the JSON against the schema with the validator from S1. Also serialise one with optional fields null and assert no `null` values appear.
+- [x] **Step 8:** `OperationIndexTest`: `find("POST", "/auth/login")?.isPublic == true`; `find("POST", "/auth/logout")?.isPublic == false`; the four passkey operations, `signUp`, `signInWithGoogle`, `signInWithApple`, `requestPasswordReset` are public; `find("GET", "/conversations/3f1c…")?.operationId == "getConversation"`; `find("POST", "/training/plans")?.isLong == true`; `find("GET", "/nope") == null`.
+- [x] **Step 9:** `./gradlew syncContract --check :core:api:test`. Expected: PASS. Commit the contract copies with the code.
+
+Done 2026-11-25 (548 tests). Deviations and findings:
+- `:core:api` is a plain Kotlin module (`khepri.kotlin.jvm`); nothing in it needs Android.
+- `GoldenMap.kt` is `src/test/resources/golden-map.txt` (164 entries: the 151 from iOS plus 13 found by strict-decoding each unmapped golden against every DTO). `tools` and `tools.readonly` are the MCP server's tool lists, not API responses, and are excluded by name.
+- Retrofit uses our own `JsonConverterFactory` instead of the kotlinx converter, so every request passes two checks: it refuses `UNKNOWN` anywhere in the body, and it puts back `null` for properties that are required and nullable. That second one was a live bug: `HelpfulRequest.helpful` is required and `null` means "clear the vote", but `explicitNulls = false` sent `{}`.
+- `RequestSchemaTest` fills every request DTO at every depth from its `SerialDescriptor` (values chosen from the schema's format, enum and minimum), checks keys recursively against the spec and validates the body; every 2xx response DTO decodes from its required properties alone.
+- There are 55 generated model enums. Design 7.1's "59 enums" counted every `enum:` site, including the 9 query and path enums that live in the endpoint interfaces.
+- `normalizeSpec` asserts 12 removed, 378 operations and 68 interfaces; `OperationIndex` holds all 390.
+- The Gradle daemon needs `MaxMetaspaceSize=2g` once Hilt and the generator run in one build.
 
 ### Task 5: `:core:network` — clients, interceptors, error mapping
 

@@ -335,7 +335,8 @@ Clearing:
 - Operations are grouped into interfaces by the first segment of their path (`MeApi`, `AuthApi`, `TrainingApi`; 68 in all), not by spec tag. S1 records the grouping; domain code never sees it, because `data` modules wrap generated calls.
 - Generator traps found in S1 (`docs/spikes/S1-generated-client.md`): quote the YAML 1.1 key `on` before parsing; map `number` → `Double` and `URI` → `String`; never send `UNKNOWN` (wire value `unknown_default_open_api`); group interfaces by first path segment, not spec tag; Retrofit query and path values go through `QueryValueConverterFactory`, or enums are sent upper case.
 - Type mapping: `uuid` → `String`; `date-time` → `Instant` with a serializer that reads RFC 3339 with or without fractional seconds (Go drops the fraction when zero and writes nanoseconds otherwise) and writes with; `date` → `LocalDate`.
-- Enums: every generated enum gets an `UNKNOWN` member; a test asserts it.
+- Enums: every generated enum gets an `UNKNOWN` member; a test asserts it. The client refuses to send `UNKNOWN` (request bodies and query values).
+- Required and nullable request properties are sent as explicit `null` (`HelpfulRequest.helpful`: null clears); optional nulls are left out.
 - Nullable sites: a small spec normalisation step before generation; contract tests assert them.
 - Field names are camelCase except `AIConsent.decided_at` and the capture/agent fields `ingredient_id`, `matched_name`, `check_in`, `amount_ml`.
 - The passkey `publicKey` field is a free-form object; keep it as raw JSON.
