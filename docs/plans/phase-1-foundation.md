@@ -1,0 +1,524 @@
+# Phase 1: Foundation Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** a debug build that signs in with email against a locally seeded backend, shows the five-tab shell, opens a `khepri://` link, and passes every quality gate in CI.
+
+**Architecture:** multi-module Gradle project with convention plugins. This phase builds `:app`, `:core:model`, `:core:common`, `:core:api`, `:core:network`, `:core:datastore`, `:core:session`, `:core:designsystem`, `:core:ui`, `:core:navigation`, `:core:testing`, and the email slice of `:feature:auth`. `:core:database` is created in Phase 2 with its first entity (Room needs at least one). The API client is generated from the pinned, committed OpenAPI spec; SSE and multipart are hand-written.
+
+**Tech Stack:** Kotlin, Jetpack Compose + Material 3, Navigation 3, Hilt, Retrofit + OkHttp, kotlinx.serialization, `java.time`, DataStore, JUnit, MockK, MockWebServer, Robolectric, Roborazzi, Maestro, Spotless + ktfmt, detekt, Android Lint.
+
+**Spec:** `docs/design.md` (sections 4, 6, 7, 8, 9, 12). Spike results: `docs/spikes/S1-*.md`, `docs/spikes/S2-*.md`, `docs/spikes/S9-*.md`.
+
+**Depends on:** spikes S1 (generator options, interface grouping, enum member name, validator choice), S2 (the contract SHA) and S9 (navigation model). Dependency vetting needs the owner's Sonatype token, or the owner approving the dependency list by hand. Nothing else in Phase 0 blocks this plan.
+
+## Global Constraints
+
+- Application id `com.fernandocorreia.khepri`; debug suffix `.debug`. `:app` namespace `com.fernandocorreia.khepri`; other modules `com.fernandocorreia.khepri.<module path with dots>` (`:core:network` → `com.fernandocorreia.khepri.core.network`).
+- minSdk 28; targetSdk and compileSdk are the current stable level.
+- Debug API base `http://10.0.2.2:8090`, release `https://kheprios.com`; the client appends `/api/v1/`. Cleartext is allowed for `10.0.2.2` only.
+- Time types are `java.time` everywhere.
+- Every version lives in `gradle/libs.versions.toml`. Use the versions recorded in the spike results; look up the current stable version for anything else.
+- Module dependencies follow the tables in `docs/design.md` section 6.1. All are `implementation`.
+- Formatting: ktfmt, width 120, indent 4. detekt zero issues, no baseline. Android Lint warnings are errors, no baseline. Generated code in `:core:api` is excluded from Spotless, detekt and explicit API mode.
+- Explicit API mode is on for every `core/*` module except `:core:api` and `:core:testing`.
+- No `!!`, no `GlobalScope`, dispatchers and `Clock` injected.
+- User-visible text comes from string resources in four locales: `values`, `values-es`, `values-pt-rPT`, `values-pt-rBR`.
+- Tests never call a real API. Use MockWebServer or fakes.
+- Database and DataStore files are excluded from backup.
+- Material 3 dynamic colour is off.
+- Commit after each task. Never commit `google-services.json`, `secrets.properties` or keystores.
+
+## Review Focus
+
+Failure modes most likely to bite. Each has a test in the task that owns the code.
+
+1. A timestamp with nanoseconds (`…:00.123456789Z`), with no fraction, or with an offset fails to decode and a whole screen breaks. → Task 4.
+2. A response carries an enum value the client does not know. → Task 4.
+3. A 401 on a request that sent no token, or whose token could not be read, signs the user out; or two concurrent 401s run sign-out twice. → Tasks 5 and 7.
+4. A write is retried after a dropped connection and happens twice. → Task 5.
+5. A link with an unexpected shape (upper-case invite code, wrong id length, unknown path, `/app/progress`) lands on the wrong screen or crashes. → Task 9.
+
+---
+
+### Task 1: Gradle project and convention plugins
+
+**Files:**
+- Create: `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`, `gradle/libs.versions.toml`, Gradle wrapper
+- Create: `build-logic/settings.gradle.kts` (includes `convention` and `detekt-rules`), `build-logic/convention/build.gradle.kts`
+- Create: `build-logic/convention/src/main/kotlin/` with one plugin class per id: `khepri.android.application`, `khepri.android.library`, `khepri.kotlin.jvm`, `khepri.compose`, `khepri.hilt`, `khepri.room`, `khepri.core`, `khepri.feature.domain`, `khepri.feature.data`, `khepri.feature.ui`
+- Create: `app/build.gradle.kts`, `app/src/main/AndroidManifest.xml`, `app/src/main/kotlin/com/fernandocorreia/khepri/MainActivity.kt`, `KhepriApplication.kt`, `di/AppConfigModule.kt`
+- Create: `app/src/main/res/values{,-es,-pt-rPT,-pt-rBR}/strings.xml` with `app_name` only (Task 10 adds the rest)
+- Create: `app/src/main/res/xml/network_security_config.xml` (no cleartext), `app/src/debug/res/xml/network_security_config.xml` (same name; adds cleartext for `10.0.2.2`)
+- Create: `app/src/main/res/xml/backup_rules.xml`, `data_extraction_rules.xml`
+- Delete: the placeholder `README.md` in each module directory when that module gets a `build.gradle.kts`
+
+**Interfaces:**
+- Produces: the plugin ids above. `khepri.core` = library + explicit API mode. `khepri.feature.domain` = `khepri.kotlin.jvm` + `:core:model`, `:core:common`. `khepri.feature.data` = library + hilt + own `:domain`, `:core:model`, `:core:common`, `:core:api`, `:core:network` (`:core:database`, `:core:datastore` added per module). `khepri.feature.ui` = library + compose + hilt + own `:domain`, `:core:ui`, `:core:designsystem`, `:core:navigation` (`:core:charts`, `:core:scene3d`, `:core:speech` added per module).
+- Produces: `@ApiBaseUrl` qualifier (declared in `:core:common`, Task 3) provided by `:app`'s `AppConfigModule` from `BuildConfig.API_BASE_URL`. This is how library modules get the URL; they never read `:app`'s `BuildConfig`.
+
+- [ ] **Step 1:** Create the wrapper, settings, version catalog and `build-logic` with the plugin classes.
+- [ ] **Step 2:** Create `:app` with a Compose `MainActivity` showing `stringResource(R.string.app_name)`. Edge-to-edge enabled.
+- [ ] **Step 3:** Debug build type: `applicationIdSuffix ".debug"`, `buildConfigField API_BASE_URL "http://10.0.2.2:8090"`. Release: `"https://kheprios.com"`, R8 full mode. The manifest references `@xml/network_security_config`; the debug source set overrides it.
+- [ ] **Step 4:** Backup and data-extraction rules exclude `databases/` and `datastore/`.
+- [ ] **Step 5:** Run `./gradlew :app:assembleDebug :app:assembleRelease`. Expected: BUILD SUCCESSFUL.
+- [ ] **Step 6:** Install on an emulator; the app opens and shows "Khepri".
+- [ ] **Step 7:** Commit.
+
+### Task 2: Quality gates, CI and pre-commit
+
+**Files:**
+- Create: `build-logic/convention/src/main/kotlin/…/QualityConventionPlugin.kt` (id `khepri.quality`, applied by every other plugin)
+- Create: `build-logic/detekt-rules/` with `NoHardcodedUiText` rule and its tests
+- Create: `config/detekt/detekt.yml`, `config/lint/lint.xml`
+- Create: `.github/workflows/ci.yml`, `.githooks/pre-commit`, `.github/pull_request_template.md`, `renovate.json`
+- Modify: root `build.gradle.kts` (module-graph assertion, dependency-analysis), `README.md` (hook setup)
+
+**Interfaces:**
+- Produces: `./gradlew check` runs `spotlessCheck`, `detekt`, `lint`, `assertModuleGraph`, `buildHealth`, unit tests.
+
+- [ ] **Step 1:** Spotless with ktfmt (Kotlin style, width 120) for `*.kt` and `*.kts`; excludes `**/build/**`.
+- [ ] **Step 2:** detekt with the Compose rules plugin; no formatting rule set; `warningsAsErrors`; long method warn 100 / error 200; cyclomatic complexity ignores simple `when`; forbid `!!`.
+- [ ] **Step 3:** Lint: `warningsAsErrors`, `abortOnError`, no baseline; `MissingTranslation`, `ContentDescription` as errors. `UnusedResources` is an error, except that it ignores the generated `strings.xml` in `:core:ui` until Phase 6.
+- [ ] **Step 4:** `NoHardcodedUiText`: lint's `HardcodedText` covers XML only and this app has none, so a detekt rule fails on a string literal passed as `text` to `Text`, or as `contentDescription` or `label` anywhere. Previews (`@Preview`) and test sources are exempt. Use an equivalent rule from the Compose rules plugin if the installed version has one. Tests: a literal in `Text("Hi")` is reported; `Text(stringResource(R.string.x))` is not; a literal inside a `@Preview` function is not.
+- [ ] **Step 5:** Module-graph assertion over the transitive graph, with the rules in `docs/design.md` 6.1: feature domain sees only model and common; feature ui never reaches `:core:api`, `:core:network`, `:core:session` or any `data` module; no feature reaches another feature; only `:app` depends on `data`; core-to-core edges as in the table.
+- [ ] **Step 6:** Prove each gate bites, on a throwaway branch that is deleted afterwards: an unformatted line; a `!!`; `Text("Hi")`; a string present in `values` but missing from `values-es`; two temporary modules `:feature:a:ui` and `:feature:b:ui` with an edge between them. Confirm `./gradlew check` fails for each.
+- [ ] **Step 7:** `ci.yml`: on push and PR, JDK setup, Gradle cache, `./gradlew check :app:assembleRelease`. Generation reads only committed files, so CI needs no sibling repo.
+- [ ] **Step 8:** `.githooks/pre-commit` runs `spotlessApply` on staged Kotlin files and `detekt` on changed modules; add `git config core.hooksPath .githooks` to the repo `README.md`.
+- [ ] **Step 9:** PR template checklist: backend deployed first; strings in four locales; screenshots updated; parity checklist rows ticked; `syncContract --check` run.
+- [ ] **Step 10:** Run `./gradlew check`. Expected: BUILD SUCCESSFUL. Commit.
+
+### Task 3: `:core:model` and `:core:common`
+
+**Files:**
+- Create in `core/model/src/main/kotlin/com/fernandocorreia/khepri/core/model/`: `AppError.kt`, `Outcome.kt`, `Session.kt`, `DataScope.kt`
+- Create in `core/common/src/main/kotlin/com/fernandocorreia/khepri/core/common/`: `DataChangeBus.kt`, `DispatcherProvider.kt`, `SessionGateway.kt`, `SignedInState.kt`, `SignOut.kt`, `TokenUnreadableException.kt`, `Qualifiers.kt`
+- Create: `app/src/main/kotlin/com/fernandocorreia/khepri/di/CommonBindings.kt` (Hilt bindings for the JVM modules, which cannot hold Hilt modules themselves)
+- Test: `core/common/src/test/kotlin/…/DataChangeBusTest.kt`, `core/model/src/test/kotlin/…/OutcomeTest.kt`
+
+**Interfaces:**
+- Produces:
+
+```kotlin
+// :core:model
+sealed interface AppError {
+    data class Unauthorized(val message: String?) : AppError
+    data class NotFound(val message: String?) : AppError
+    data class Conflict(val message: String?, val newerVersionJson: String?) : AppError
+    data class FieldValidation(val message: String, val fields: Map<String, String>) : AppError
+    data class Server(val status: Int, val message: String?, val code: String?) : AppError
+    data class Refused(val code: String, val message: String?) : AppError
+    data class Network(val interrupted: Boolean) : AppError
+    data object Locked : AppError
+    data object InvalidResponse : AppError
+}
+sealed interface Outcome<out T> {
+    data class Ok<T>(val value: T) : Outcome<T>
+    data class Err(val error: AppError) : Outcome<Nothing>
+}
+inline fun <T, R> Outcome<T>.map(transform: (T) -> R): Outcome<R>
+data class Session(val token: String, val userId: String, val expiresAt: java.time.Instant)
+enum class DataScope { Day, Training, Nutrition, Social, Goals, Profile }
+
+// :core:common
+interface DataChangeBus { val changes: Flow<DataScope>; fun changed(scope: DataScope) }
+interface DispatcherProvider { val main: CoroutineDispatcher; val io: CoroutineDispatcher; val default: CoroutineDispatcher }
+/** How a feature reports a successful sign-in without seeing :core:session. */
+interface SessionGateway { suspend fun signedIn(session: Session) }
+/** True while the phase is SignedIn. Lets :core:navigation hold links without seeing :core:session. */
+interface SignedInState { val signedIn: StateFlow<Boolean> }
+enum class SignOutReason { Explicit, Unauthorized }
+/** Multibound with Hilt; any module registers one. */
+interface SignOutCleaner {
+    /** Server calls that need a live token (push unregister). Run only for Explicit, before logout. */
+    suspend fun beforeLogout() {}
+    /** Local cleanup. Run for both reasons, after the session is gone. */
+    suspend fun afterLogout(reason: SignOutReason)
+}
+/** A token exists but cannot be read right now (Keystore failure). The request is not sent; nobody is signed out. */
+class TokenUnreadableException(cause: Throwable? = null) : java.io.IOException(cause)
+@Qualifier annotation class ApiBaseUrl
+@Qualifier annotation class ApplicationScope
+```
+
+- Hilt in `CommonBindings`: `SharedFlowDataChangeBus` as `DataChangeBus` (singleton), `DefaultDispatcherProvider`, `Clock.systemDefaultZone()`, an `@ApplicationScope CoroutineScope` (`SupervisorJob() + Dispatchers.Default`).
+
+- [ ] **Step 1:** Write `DataChangeBusTest`: `changed(Day)` is received by two active collectors; a collector that subscribes after the emission does not receive it; `changed` called with no collector returns immediately and does not throw.
+- [ ] **Step 2:** Run it; expect failure (class missing).
+- [ ] **Step 3:** Implement `SharedFlowDataChangeBus` (`MutableSharedFlow(replay = 0, extraBufferCapacity = 64)`, `tryEmit`).
+- [ ] **Step 4:** Write and pass `OutcomeTest` for `map` on `Ok` and `Err`.
+- [ ] **Step 5:** Add `CommonBindings` to `:app`.
+- [ ] **Step 6:** `./gradlew :core:model:test :core:common:test`. Expected: PASS. Commit.
+
+### Task 4: `:core:api` — contract sync, generation, contract tests
+
+**Files:**
+- Create: `core/api/build.gradle.kts`, `core/api/contract.sha` (the SHA chosen in S2)
+- Create: `core/api/contract/openapi.yaml`, `core/api/contract/medals.json`, `core/api/contract/golden/**` (written by `syncContract`, **committed**)
+- Create: `build-logic/convention/src/main/kotlin/…/SyncContractTask.kt` (registers `syncContract`, with `--check`)
+- Create: `build-logic/convention/src/main/kotlin/…/OperationIndexTask.kt` (generates `OperationIndex.kt` from the spec)
+- Create: `core/api/templates/`, `core/api/normalize-spec.*` (from S1)
+- Create: `core/api/src/main/kotlin/com/fernandocorreia/khepri/core/api/FlexibleInstantSerializer.kt`, `ApiJson.kt`, `GoldenMap.kt`
+- Test: `core/api/src/test/kotlin/…/FlexibleInstantSerializerTest.kt`, `EnumToleranceTest.kt`, `GoldenContractTest.kt`, `RequestSchemaTest.kt`, `OperationIndexTest.kt`
+
+**Interfaces:**
+- Consumes: generator options, template overrides, the default-interface name, the unknown-enum member name, and the validator choice from `docs/spikes/S1-*.md`.
+- Produces:
+  - Generated models in `com.fernandocorreia.khepri.core.api.model`, all suffixed `Dto` (`TodayResponseDto`, `OutcomeDto`); Retrofit interfaces in `com.fernandocorreia.khepri.core.api`, every method `suspend` and returning `retrofit2.Response<T>`.
+  - `object ApiJson { val default: Json; val strict: Json }`: `default` has `ignoreUnknownKeys = true`, `explicitNulls = false`, `encodeDefaults = false`; `strict` is the same with `ignoreUnknownKeys = false`.
+  - `data class OperationEntry(val method: String, val pathTemplate: String, val operationId: String, val isPublic: Boolean, val isLong: Boolean)` and `object OperationIndex { val entries: List<OperationEntry>; fun find(method: String, path: String): OperationEntry? }`. `path` is the request path without `/api/v1`; templates match one path segment per `{param}`. `isPublic` = spec `security: []` except `logOut`. `isLong` = the eight operations in `docs/design.md` 7.3.
+  - `const val UNKNOWN_ENUM = "<member name recorded in S1>"`. If S1 renamed the member to `UNKNOWN` with a template, this is `"UNKNOWN"`.
+
+- [ ] **Step 1:** `syncContract` reads `contract.sha` and, using `git -C ../north-client show <sha>:<path>`, writes `docs/api/openapi.yaml`, `docs/medals/medals.json` and every file matching `internal/*/testdata/*.golden.json` (all packages, not the iOS subset) into `core/api/contract/`. `--check` fails if any committed copy differs or is missing. It never reads the `north-client` working tree.
+- [ ] **Step 2:** Write `FlexibleInstantSerializerTest` (`java.time.Instant`):
+
+```kotlin
+@Test fun `reads whole seconds`() = assertEquals(Instant.parse("2026-09-24T07:15:00Z"), decode("\"2026-09-24T07:15:00Z\""))
+@Test fun `reads nanoseconds`() = assertEquals(Instant.parse("2026-09-24T07:15:00.123456789Z"), decode("\"2026-09-24T07:15:00.123456789Z\""))
+@Test fun `reads an offset`() = assertEquals(Instant.parse("2026-09-24T05:15:00Z"), decode("\"2026-09-24T07:15:00+02:00\""))
+@Test fun `writes milliseconds`() = assertEquals("\"2026-09-24T07:15:00.000Z\"", encode(Instant.parse("2026-09-24T07:15:00Z")))
+@Test fun `truncates to milliseconds`() = assertEquals("\"2026-09-24T07:15:00.123Z\"", encode(Instant.parse("2026-09-24T07:15:00.123456789Z")))
+@Test fun `rejects a non-date`() { assertFailsWith<SerializationException> { decode("\"yesterday\"") } }
+```
+
+- [ ] **Step 3:** Run; expect failure. Implement with `DateTimeFormatter.ISO_OFFSET_DATE_TIME` for reading. Run; expect PASS.
+- [ ] **Step 4:** Wire generation from `core/api/contract/openapi.yaml`: normalise (both nullable forms), generate with model suffix `Dto`, exclude `replyInConversation`, `resumeConversation`, `streamCrewLive` and the 9 multipart operations; map `uuid` → `String`, `date-time` → `Instant` with the serializer, `date` → `LocalDate`. Output under `build/`; excluded from Spotless, detekt and explicit API.
+- [ ] **Step 5:** `EnumToleranceTest`: reflectively list every generated enum; assert each has a member named `UNKNOWN_ENUM`; decode `"definitely-not-a-value"` into one enum-typed field of a real response DTO and assert that member.
+- [ ] **Step 6:** `GoldenMap.kt`: golden file name → serializer, built from the mapping in `K/NorthKit/Tests/NorthAPITests/ContractTests.swift`, extended for the files iOS does not cover. `GoldenContractTest`: decode each committed golden file with `ApiJson.strict`; fail if a file in `contract/golden/` has no entry, or an entry has no file.
+- [ ] **Step 7:** `RequestSchemaTest`: for every generated request DTO, serialise a fully populated instance with `ApiJson.default`; fail on any key that is not a declared property of its schema in the spec (resolving `$ref` and `allOf`); then validate the JSON against the schema with the validator from S1. Also serialise one with optional fields null and assert no `null` values appear.
+- [ ] **Step 8:** `OperationIndexTest`: `find("POST", "/auth/login")?.isPublic == true`; `find("POST", "/auth/logout")?.isPublic == false`; the four passkey operations, `signUp`, `signInWithGoogle`, `signInWithApple`, `requestPasswordReset` are public; `find("GET", "/conversations/3f1c…")?.operationId == "getConversation"`; `find("POST", "/training/plans")?.isLong == true`; `find("GET", "/nope") == null`.
+- [ ] **Step 9:** `./gradlew syncContract --check :core:api:test`. Expected: PASS. Commit the contract copies with the code.
+
+### Task 5: `:core:network` — clients, interceptors, error mapping
+
+**Files:**
+- Create in `core/network/src/main/kotlin/com/fernandocorreia/khepri/core/network/`: `TokenSource.kt`, `BearerInterceptor.kt`, `LanguageInterceptor.kt`, `LongCallInterceptor.kt`, `RetryInterceptor.kt`, `ApiCall.kt`, `ErrorEnvelope.kt`, `di/NetworkModule.kt`
+- Test: `core/network/src/test/kotlin/…/BearerInterceptorTest.kt`, `LanguageInterceptorTest.kt`, `LongCallInterceptorTest.kt`, `RetryInterceptorTest.kt`, `ApiCallTest.kt`
+
+**Interfaces:**
+- Consumes: `OperationIndex`, `ApiJson`, `AppError`, `Outcome`, `TokenUnreadableException`, `@ApiBaseUrl`.
+- Produces:
+
+```kotlin
+interface TokenSource {
+    /** Null when signed out. Throws TokenUnreadableException when a token exists but cannot be read. */
+    suspend fun token(): String?
+    /** Called after a 401 on a request that carried a token. Must be cheap and idempotent. */
+    fun onUnauthorized()
+}
+/** Supplies the phone's languages, most preferred first, as BCP 47 tags. */
+fun interface PreferredLanguages { fun get(): List<String> }
+suspend fun <T : Any> apiCall(block: suspend () -> Response<T>): Outcome<T>
+suspend fun apiCallUnit(block: suspend () -> Response<Unit>): Outcome<Unit>   // 2xx with no body, e.g. 204
+@Qualifier annotation class DefaultClient
+@Qualifier annotation class StreamingClient
+```
+
+- Two OkHttp clients sharing one connection pool: default (connect 15 s, read 60 s) and streaming (read timeout none). Interceptors on both, outermost first: `LanguageInterceptor`, `BearerInterceptor`, `LongCallInterceptor` (default client only), `RetryInterceptor`. Retrofit at `"$apiBaseUrl/api/v1/"` on the default client, with `ApiJson.default`.
+- `PreferredLanguages` default implementation reads `LocaleListCompat.getAdjustedDefault()`; tests inject a list.
+
+- [ ] **Step 1:** Write `BearerInterceptorTest` (MockWebServer):
+  - `adds the token to a protected path`: header is `Bearer t0ken`.
+  - `sends no token to a public path`: `POST /api/v1/auth/login` has no `Authorization`.
+  - `logout carries the token`.
+  - `401 with a token sent calls onUnauthorized`.
+  - `401 on a public path does not call onUnauthorized`.
+  - `401 when signed out does not call onUnauthorized`.
+  - `unreadable token stops the request`: `token()` throws; the server receives nothing; the call fails with `TokenUnreadableException`; `onUnauthorized` is not called.
+- [ ] **Step 2:** Run; expect failure. Implement (look up the entry with `OperationIndex.find`). Run; expect PASS.
+- [ ] **Step 3:** `LanguageInterceptorTest`: `["pt-PT","en","es","fr"]` → `pt-PT, en;q=0.9, es;q=0.8`; a request that already has the header is unchanged; an empty list adds nothing.
+- [ ] **Step 4:** `LongCallInterceptorTest`: `POST /api/v1/training/plans` proceeds with a 300 s read timeout; `GET /api/v1/today` keeps 60 s.
+- [ ] **Step 5:** `RetryInterceptorTest`:
+  - `GET is retried once after a dropped connection` (first response `DISCONNECT_AT_START`, second 200): 2 requests.
+  - `GET is not retried twice`: two drops → failure, 2 requests.
+  - `POST is never retried`: 1 request.
+  - `an event stream is never retried`: `Accept: text/event-stream`, 1 request.
+  - `a 500 is not retried`.
+  - The delay is injected; production value 500 ms.
+- [ ] **Step 6:** `ApiCallTest`, in the iOS order:
+
+| Response | Expected |
+|---|---|
+| 200 with body | `Ok(body)` |
+| 204 via `apiCallUnit` | `Ok(Unit)` |
+| 401 `{"error":{"message":"m"}}` | `Unauthorized("m")` |
+| 404 | `NotFound(message)` |
+| 409 with error envelope | `Conflict("m", null)` |
+| 409 with a non-envelope JSON body | `Conflict(null, thatJson)` |
+| 422 `{"error":{"message":"m","fields":{"email":"taken"}}}` | `FieldValidation("m", {"email":"taken"})` |
+| 429 with `fields` | `FieldValidation(…)` |
+| 429 without `fields` | `Server(429, "m", null)` |
+| 403 `{"error":{"message":"m","code":"ai_consent_required"}}` | `Refused("ai_consent_required","m")` |
+| 500 `{"error":{"message":"m","code":"import_partial"}}` | `Server(500, "m", "import_partial")` |
+| 500 with no body | `Server(500, null, null)` |
+| `SocketTimeoutException`, `ConnectException`, `UnknownHostException`, connection reset | `Network(interrupted = true)` |
+| any other `IOException` | `Network(interrupted = false)` |
+| `TokenUnreadableException` | `Locked` |
+| 200 with undecodable body | `InvalidResponse` |
+
+- [ ] **Step 7:** Implement `apiCall`, `apiCallUnit` and `ErrorEnvelope`. Run; expect PASS.
+- [ ] **Step 8:** `NetworkModule` provides both clients, `Retrofit`, and each generated interface (`retrofit.create(...)`). Commit.
+
+### Task 6: `:core:network` — SSE and multipart helpers
+
+**Files:**
+- Create: `core/network/src/main/kotlin/…/sse/SseEvent.kt`, `SseClient.kt`, `multipart/UriRequestBody.kt`
+- Test: `core/network/src/test/kotlin/…/sse/SseClientTest.kt`, `multipart/UriRequestBodyTest.kt`
+
+**Interfaces:**
+- Produces:
+
+```kotlin
+data class SseEvent(val name: String?, val data: String)
+class SseException(val error: AppError) : Exception()
+class SseClient @Inject constructor(@StreamingClient client: OkHttpClient) {
+    /** Cold. Completes when the server closes the stream. Fails with SseException on a non-2xx status. */
+    fun events(request: Request): Flow<SseEvent>
+}
+class UriRequestBody(resolver: ContentResolver, uri: Uri, contentType: MediaType) : RequestBody()
+```
+
+- [ ] **Step 1:** `SseClientTest`: a body of `event: token\ndata: {"text":"Hi"}\n\n: ping\n\nevent: done\ndata: {}\n\n` yields two events (`token`, `done`) and completes; comments are skipped; a 403 with an error envelope fails with `SseException(Refused(…))`; cancelling the collector closes the connection.
+- [ ] **Step 2:** Run; expect failure. Implement on the OkHttp SSE artefact with `callbackFlow`. Run; expect PASS.
+- [ ] **Step 3:** `UriRequestBodyTest` (Robolectric, a temp file URI): streams the bytes; reports `contentLength()` when the resolver knows it, `-1` otherwise.
+- [ ] **Step 4:** Commit.
+
+### Task 7: `:core:datastore` and `:core:session`
+
+**Files:**
+- Create in `core/datastore/src/main/kotlin/…/core/datastore/`: `SessionStore.kt`, `TokenCipher.kt`, `KeystoreTokenCipher.kt`, `di/DataStoreModule.kt`
+- Create in `core/session/src/main/kotlin/…/core/session/`: `AppPhase.kt`, `SessionRemote.kt`, `SessionRemoteImpl.kt`, `StoredTokenSource.kt`, `UnauthorizedSignal.kt`, `SessionManager.kt`, `di/SessionModule.kt`
+- Test: `core/datastore/src/test/…/SessionStoreTest.kt`, `core/datastore/src/androidTest/…/KeystoreTokenCipherTest.kt`, `core/session/src/test/…/SessionManagerTest.kt`, `StoredTokenSourceTest.kt`
+
+**Interfaces:**
+- Consumes: `Session`, `SessionGateway`, `SignedInState`, `SignOutCleaner`, `SignOutReason`, `TokenUnreadableException`, `TokenSource`, `apiCall`, the generated interface holding `getMe` and `logOut` (name from S1).
+- Produces:
+
+```kotlin
+// :core:datastore
+interface TokenCipher { fun encrypt(plain: ByteArray): ByteArray; fun decrypt(sealed: ByteArray): ByteArray }   // AES-GCM Keystore key in production
+interface SessionStore {
+    /** Throws TokenUnreadableException when stored data cannot be decrypted right now. Leaves the data in place. */
+    suspend fun read(): Session?
+    suspend fun write(session: Session)
+    suspend fun clear()
+}
+
+// :core:session
+sealed interface AppPhase {
+    data object Launching : AppPhase; data object Locked : AppPhase; data object SignedOut : AppPhase
+    data object Onboarding : AppPhase; data object SignedIn : AppPhase
+    data class Failed(val error: AppError) : AppPhase
+}
+/** Narrow port over the generated client, so SessionManager tests need no HTTP. */
+interface SessionRemote {
+    /** GET /me. True when onboarding is complete. */
+    suspend fun onboardingComplete(): Outcome<Boolean>
+    suspend fun logout(): Outcome<Unit>
+}
+/** onUnauthorized() posts here; SessionManager collects. Breaks the TokenSource → client → SessionManager cycle. */
+class UnauthorizedSignal { val events: SharedFlow<Unit>; fun post() }
+/** The only TokenSource. Depends on SessionStore and UnauthorizedSignal only. */
+class StoredTokenSource(store: SessionStore, signal: UnauthorizedSignal) : TokenSource
+class SessionManager(
+    store: SessionStore, remote: SessionRemote, signal: UnauthorizedSignal,
+    cleaners: Set<@JvmSuppressWildcards SignOutCleaner>, @ApplicationScope scope: CoroutineScope,
+) : SessionGateway, SignedInState {
+    val phase: StateFlow<AppPhase>
+    suspend fun start()                        // read session, GET /me, decide the phase
+    override suspend fun signedIn(session: Session)   // write, then GET /me to choose Onboarding or SignedIn
+    suspend fun signOut(reason: SignOutReason)
+    suspend fun retry()                        // from Failed or Locked
+}
+```
+
+- `SessionManager` collects `UnauthorizedSignal.events` in `scope` and calls `signOut(Unauthorized)`, ignoring events while the phase is already `SignedOut` (concurrent 401s run sign-out once).
+- `:app` calls `retry()` while `Locked` on each `ProcessLifecycleOwner` `ON_START` and on `Intent.ACTION_USER_UNLOCKED`, as iOS retries when protected data becomes available.
+
+- [ ] **Step 1:** `SessionStoreTest` (Robolectric, fake `TokenCipher` that XORs): write then read returns the same session; clear then read returns null; a cipher that throws on decrypt makes `read()` throw `TokenUnreadableException` and the data is still there afterwards.
+- [ ] **Step 2:** Implement `SessionStore` on DataStore. `KeystoreTokenCipherTest` is an instrumented test (emulator): round trip; it is not part of `check` and runs in the Phase 6 device suite.
+- [ ] **Step 3:** `StoredTokenSourceTest`: returns the stored token; null when signed out; propagates `TokenUnreadableException`; `onUnauthorized()` posts to the signal.
+- [ ] **Step 4:** `SessionManagerTest` with fakes. iOS `AppModelTests` has four cases (three locked cases, one with no session); port those, and add the rest:
+  - no session → `SignedOut`
+  - session, `onboardingComplete` = false → `Onboarding`; true → `SignedIn`
+  - session, `/me` network error → `Failed`; `retry()` re-runs and reaches `SignedIn`
+  - `read()` throws → `Locked`; the session is not cleared; `retry()` after the cipher recovers → `SignedIn`
+  - `signedIn(session)` writes the session, calls `/me`, and lands on `Onboarding` or `SignedIn`
+  - a posted signal → no `beforeLogout`, no logout call; store cleared; `afterLogout(Unauthorized)` on every cleaner; phase `SignedOut`
+  - two signals posted together → cleaners run once
+  - `signOut(Explicit)` runs in this order, asserted with a recording fake: every `beforeLogout()`, then `logout()` (the token is still readable), then store cleared, then every `afterLogout(Explicit)`, then phase `SignedOut`
+  - a failing `beforeLogout()` or `logout()` does not stop the local clear
+  - an `expiresAt` in the past does not sign out by itself
+  - `signedIn` (the `SignedInState` flow) is true exactly while the phase is `SignedIn`
+- [ ] **Step 5:** Implement. `SessionModule` binds `StoredTokenSource` as `TokenSource`, `SessionManager` as `SessionGateway` and `SignedInState`, and `SessionRemoteImpl` (which wraps the generated calls with `apiCall`). Run; expect PASS. Commit.
+
+### Task 8: `:core:designsystem`, `:core:ui`, `:core:testing`
+
+**Files:**
+- Create: `tools/sync_theme.py` (reads the same web CSS source as `K/scripts/sync-theme.py`; writes `core/designsystem/src/main/kotlin/…/theme/KhepriColors.kt`)
+- Create: `core/designsystem/src/main/kotlin/…/theme/KhepriTheme.kt`, `Type.kt`, `Shape.kt`, `Spacing.kt`, `Appearance.kt`; `component/SurfaceCard.kt`, `ProminentButton.kt`, `KhepriTextField.kt`, `Eyebrow.kt`
+- Create: `core/designsystem/src/main/res/font/` (Geist, Geist Mono, Marcellus copied from `K/NorthKit/Sources/NorthKit/Resources/Fonts/`, renamed to lower-case resource names)
+- Create: `core/ui/src/main/kotlin/…/Loadable.kt`, `ActionState.kt`, `ReduceMotion.kt`, `Haptics.kt`, `ErrorState.kt`
+- Create: `core/testing/src/main/kotlin/…/MainDispatcherRule.kt`, `TestDispatcherProvider.kt`, `FakeDataChangeBus.kt`
+- Test: `core/designsystem/src/test/…/ThemeTokensTest.kt`, `ComponentScreenshotTest.kt`
+
+**Interfaces:**
+- Produces: `KhepriTheme(appearance: Appearance = Appearance.System, content: @Composable () -> Unit)`, `KhepriTheme.colors`, `.spacing`, `.shapes`; `enum class Appearance { System, Light, Dark }` (in `:core:designsystem`); `Loadable<T>` and `ActionState` as in `docs/design.md` 6.3; `LocalReduceMotion: ProvidableCompositionLocal<Boolean>` (true when the animator duration scale is 0); `enum class Haptic { Success, Selection, Warning, Error, Heavy }` with `fun View.perform(haptic: Haptic)`.
+
+- [ ] **Step 1:** Read `K/scripts/sync-theme.py` to find its input; write `tools/sync_theme.py` to emit light and dark `Color` values for every token.
+- [ ] **Step 2:** `ThemeTokensTest`: light Background `#F5F2EB`, dark Background `#0C111B`, light Signal `#846328`, dark Signal `#E0B86A`, light Destructive `#9E413D`, dark Destructive `#D27E7C`; radii 6, 10, 12, 16 dp; spacing 4, 8, 12, 16, 20, 24 dp.
+- [ ] **Step 3:** Theme: Material 3 colour scheme built from tokens; dynamic colour off; Geist for all text styles, Marcellus as `displayBrand`, Geist Mono as `mono`.
+- [ ] **Step 4:** Components: cards have no shadow; prominent button; text field with a trailing icon that has a content description and a 48 dp target.
+- [ ] **Step 5:** Roborazzi screenshots of each component: light/dark × font scale 1.0/2.0. Record and commit the goldens. Add `verifyRoborazzi` to `check`.
+- [ ] **Step 6:** `./gradlew :core:designsystem:check :core:ui:check`. Expected: PASS. Commit.
+
+### Task 9: `:core:navigation` — destinations and deep links
+
+**Files:**
+- Create: `core/navigation/src/main/kotlin/…/AppTab.kt`, `AppDestination.kt`, `DeepLinkParser.kt`, `Navigator.kt`, `PendingLinks.kt`, `EntryInstaller.kt`
+- Test: `core/navigation/src/test/…/DeepLinkParserTest.kt`, `NavigatorTest.kt`
+
+**Interfaces:**
+- Consumes: `SignedInState`; the back-stack model from `docs/spikes/S9-*.md`.
+- Produces:
+
+```kotlin
+enum class AppTab { Today, Coach, Training, Progress, More }
+sealed interface AppDestination {
+    data class Tab(val tab: AppTab) : AppDestination; data object Settings : AppDestination
+    data class TrainingDay(val day: Int) : AppDestination; data class StartWorkout(val day: Int) : AppDestination
+    data class NextWorkout(val start: Boolean) : AppDestination
+    data class Section(val id: String) : AppDestination; data class Decision(val id: String) : AppDestination
+    data class Goal(val id: String) : AppDestination
+    data class CheckIn(val mood: Int) : AppDestination; data object CheckInFlow : AppDestination
+    data class Invite(val code: String) : AppDestination; data class CrewJoin(val code: String) : AppDestination
+    data class CrewChannel(val crewId: String, val channelId: String?) : AppDestination
+    data class Exercise(val slug: String) : AppDestination; data class Muscle(val id: String) : AppDestination
+    data object WeeklyReview : AppDestination; data object Horizon : AppDestination; data object FirstWeekReview : AppDestination
+    data class AskCoach(val draft: String) : AppDestination; data class Conversation(val id: String) : AppDestination
+}
+object DeepLinkParser { fun parse(link: String): AppDestination?; val sections: Set<String> }
+interface PendingLinks { suspend fun put(destination: AppDestination); suspend fun take(): List<AppDestination> }  // DataStore-backed in :app
+interface Navigator { fun open(destination: AppDestination); fun open(link: String): Boolean }
+```
+
+- `sections` = goals, check-ins, progress-check, reports, memories, knowledge, nutrition, care, mind, decisions, friends, crews, inbox, daily, awards.
+
+- [ ] **Step 1:** Write `DeepLinkParserTest` as a table. First port every case from the iOS router tests (`K/khepriTests`: the router, shell and `MorePath` tests). The rows below were derived by reading `destination(for:)` in `K/khepri/App/AppRouter.swift`, not by running it; if an iOS test disagrees with a row, the iOS test wins and this table is corrected. (U = a valid UUID in upper case; u = the same lower-cased.)
+
+| Link | Expected |
+|---|---|
+| `khepri://today`, `/app`, `/app/today` | `Tab(Today)` |
+| `khepri://chat`, `/app/coach/abc` | `Tab(Coach)` |
+| `khepri://training`, `/app/workouts`, `/app/activity` | `Tab(Training)` |
+| `khepri://training/next` | `NextWorkout(false)` |
+| `khepri://training/next/start` | `NextWorkout(true)` |
+| `khepri://training/plan1/3` | `TrainingDay(3)` |
+| `khepri://training/plan1/3/start` | `StartWorkout(3)` |
+| `khepri://training/plan1/x` | `Tab(Training)` |
+| `/app/insights`, `/app/fitness` | `Tab(Progress)` |
+| `khepri://progress` | `Tab(Progress)` |
+| `/app/progress`, `https://kheprios.com/app/progress` | `Section("progress-check")` |
+| `khepri://check-ins?mood=4` | `CheckIn(4)` |
+| `khepri://check-ins?mood=9`, `khepri://check-ins` | `Section("check-ins")` |
+| `khepri://decisions/U` | `Decision(U)` |
+| `khepri://decisions/not-a-uuid` | `Section("decisions")` |
+| `khepri://goals/U` | `Goal(U)` |
+| `/app/crews/U` | `CrewChannel(u, null)` |
+| `/app/crews/U/c/U2` | `CrewChannel(u, u2)` |
+| `/app/crews/U/x/U2` | `Section("crews")` |
+| `https://kheprios.com/i/AbC123xYz9` | `Invite("abc123xyz9")` |
+| `https://kheprios.com/i/short` | `null` |
+| `https://kheprios.com/i/c/AbC123xYz9` | `CrewJoin("abc123xyz9")` |
+| `/app/first-week/review` | `FirstWeekReview` |
+| `/app/first-week` | `Tab(Today)` |
+| `khepri://exercises/push-up` | `Exercise("push-up")` |
+| `khepri://exercises` | `Tab(Training)` |
+| `khepri://settings` | `Settings` |
+| `khepri://weekly`, `khepri://horizon`, `khepri://more` | `WeeklyReview`, `Horizon`, `Tab(More)` |
+| `khepri://care` | `Section("care")` |
+| `khepri://nonsense`, `https://example.com/app/today`, `mailto:x@y.z` | `null` |
+
+- [ ] **Step 2:** Run; expect failure. Implement as a pure function following `destination(for:)` line by line. Run; expect PASS.
+- [ ] **Step 3:** `NavigatorTest`: `open(Goal(id))` selects More and produces the stack [More root, Goals, Goal(id)]; `open(CheckInFlow)` keeps the tab and adds a sheet entry; opening the same `CrewChannel` twice delivers two commands; a destination opened while `SignedInState.signedIn` is false is held and delivered once it turns true; `Invite` and `CrewJoin` go through `PendingLinks.put` so they survive process death and sign-up.
+- [ ] **Step 4:** Implement `Navigator` on the back-stack model from S9 (per-tab stacks; re-select pops to root).
+- [ ] **Step 5:** `./gradlew :core:navigation:test`. Expected: PASS. Commit.
+
+### Task 10: Strings pipeline
+
+**Files:**
+- Create: `tools/convert_strings.py`, `tools/check_translations.py`, `tools/strings-keys.json` (stable key map, committed), `tools/test_convert_strings.py`
+- Create: `core/ui/src/main/res/values{,-es,-pt-rPT,-pt-rBR}/strings.xml` (generated, committed)
+
+**Interfaces:**
+- Produces: `python3 tools/convert_strings.py` regenerates the four files from `K/khepri/Resources/Localizable.xcstrings`, `K/KhepriWidgets/Localizable.xcstrings`, `K/KhepriShare/Localizable.xcstrings` and `K/NorthKit/Sources/NorthAPI/Resources/Localizable.xcstrings`; `python3 tools/check_translations.py` exits non-zero when any key is missing from any locale in any module.
+
+- [ ] **Step 1:** Tests for the converter: a plain key; a key with one `%@` and one `%lld` becomes `%1$s` and `%2$d`; a plural variation becomes `<plurals>`; apostrophes and `&` are escaped; a key already in `strings-keys.json` keeps its name when the English text changes; a new key gets a generated snake-case name.
+- [ ] **Step 2:** Implement. Run on the real catalogs. Expected: four files with the same key set.
+- [ ] **Step 3:** Wire `check_translations.py` into `check` and CI. (Lint `MissingTranslation` also catches it; the script covers the per-module case and gives a readable list.)
+- [ ] **Step 4:** Commit.
+
+### Task 11: `:feature:auth` first slice — email sign-in and sign-up
+
+**Files:**
+- Create in `feature/auth/domain`: `model/SignUpForm.kt`, `repository/AuthRepository.kt`, `usecase/SignInWithEmail.kt`, `SignUpWithEmail.kt`, `RequestPasswordReset.kt`
+- Create in `feature/auth/data`: `repository/AuthRepositoryImpl.kt`, `remote/AuthMappers.kt`, `di/AuthDataModule.kt`
+- Create in `feature/auth/ui`: `login/LoginScreen.kt`, `LoginViewModel.kt`, `LoginUiState.kt`, `ForgotPasswordSheet.kt`, `PasswordStrengthMeter.kt`, `navigation/AuthEntries.kt`
+- Test: `feature/auth/domain/src/test/…/SignInWithEmailTest.kt`, `feature/auth/data/src/test/…/AuthRepositoryImplTest.kt`, `feature/auth/ui/src/test/…/LoginViewModelTest.kt`, `LoginScreenScreenshotTest.kt`
+
+**Interfaces:**
+- Consumes: generated auth operations, `apiCall`, `SessionGateway`.
+- Produces:
+
+```kotlin
+interface AuthRepository {
+    suspend fun signIn(email: String, password: String): Outcome<Session>
+    suspend fun signUp(form: SignUpForm): Outcome<Session>          // SignUpForm(name, email, password, confirmation, timezone: ZoneId)
+    suspend fun requestPasswordReset(email: String): Outcome<Unit>
+}
+class SignInWithEmail(repo: AuthRepository, gateway: SessionGateway) { suspend operator fun invoke(email: String, password: String): Outcome<Unit> }
+```
+
+- The use cases call `SessionGateway.signedIn` on success, so the `ui` module never sees `:core:session`.
+- Read first: `K/khepri/Features/Auth/UI/LoginViewModel.swift`, `LoginScreen.swift`, `SignInView.swift`, `SignUpView.swift`, `Services/AuthService.swift`.
+
+- [ ] **Step 1:** `AuthRepositoryImplTest` (MockWebServer): login success maps `AuthResponseDto` to `Session`; 422 with `fields` → `FieldValidation`; 429 without `fields` → `Server(429, …)`; sign-up sends `timezone` (zone id string) and `passwordConfirmation`; every request body passes the `RequestSchemaTest` key check.
+- [ ] **Step 2:** `SignInWithEmailTest`: success calls the gateway once; failure does not call it.
+- [ ] **Step 3:** `LoginViewModelTest`: mode switch keeps the email; sign-up with mismatched passwords shows the inline error and makes no call; a failed sign-in keeps the form filled and emits the error-haptic effect; submit is disabled while running.
+- [ ] **Step 4:** Implement domain, data, ViewModel. Run; expect PASS.
+- [ ] **Step 5:** `LoginScreen`: wordmark in Marcellus, tagline, Sign In / Sign Up segmented switch with a sliding indicator that respects reduce motion, banners announced with a live region, flat emblem image (3D arrives in Phase 5). Passkey, Google and Apple buttons are not rendered until lane F.
+- [ ] **Step 6:** Screenshots: sign-in and sign-up, light/dark, font scale 1.0/2.0, en and pt-PT.
+- [ ] **Step 7:** Commit.
+
+### Task 12: `:app` — phase root, tab shell, links, smoke flow
+
+**Files:**
+- Modify: `app/src/main/kotlin/com/fernandocorreia/khepri/MainActivity.kt`, `app/src/main/AndroidManifest.xml`
+- Create: `app/src/main/kotlin/…/RootContent.kt`, `shell/MainTabs.kt`, `shell/PlaceholderScreen.kt`, `FailedScreen.kt`, `LockedScreen.kt`, `LockedRetry.kt`, `di/PendingLinksStore.kt`, `debug/StrictModeInitializer.kt`
+- Create: `maestro/flows/smoke-sign-in.yaml`, `maestro/README.md`
+- Test: `app/src/test/…/RootContentTest.kt`, `app/src/test/…/HiltGraphTest.kt`
+
+**Interfaces:**
+- Consumes: `SessionManager.phase`, `Navigator`, the `EntryInstaller` set, `LoginScreen`.
+
+- [ ] **Step 1:** `RootContentTest` (Robolectric Compose): each `AppPhase` renders its screen; `Failed` shows Try Again and Sign Out; `Locked` never shows the login form.
+- [ ] **Step 2:** `HiltGraphTest` (Robolectric + Hilt test runner): the application component builds; `TokenSource`, both OkHttp clients, `SessionManager` and `Navigator` resolve (no dependency cycle).
+- [ ] **Step 3:** Implement `RootContent`. `Onboarding` shows a placeholder with Sign Out until Phase 3. `LockedRetry` calls `SessionManager.retry()` on `ON_START` and `ACTION_USER_UNLOCKED` while `Locked`.
+- [ ] **Step 4:** `MainTabs`: five tabs with labels from strings, one stack each, placeholder roots; More shows Sign Out with a confirmation dialog.
+- [ ] **Step 5:** Manifest intent filters: scheme `khepri`; `https://kheprios.com` paths `/app` and `/i` with `autoVerify`. `MainActivity` passes incoming links to `Navigator.open(link)` and opens the browser when it returns false.
+- [ ] **Step 6:** StrictMode in debug: thread policy (disk, network) and VM policy (leaked closables) with `penaltyDeath`.
+- [ ] **Step 7:** Start the backend at the pinned SHA, not from the working checkout: `git -C ../north-client worktree add ../north-client-pinned $(cat core/api/contract.sha)`, then run it as `../north-client/AGENTS.md` describes, on port 8090. Seed it (read `K/scripts/seed-review-account.sh` for the account).
+- [ ] **Step 8:** Write `smoke-sign-in.yaml`: launch, sign in, assert the Today tab, tap each tab, open `khepri://more` and assert the More tab, sign out, assert the login screen.
+- [ ] **Step 9:** Run `maestro test maestro/flows/smoke-sign-in.yaml`. Expected: PASS.
+- [ ] **Step 10:** Run `./gradlew check :app:assembleRelease`. Expected: BUILD SUCCESSFUL. Push; CI green. Commit.
+
+---
+
+## Done when
+
+- [ ] A debug build signs in against a locally seeded server, switches tabs, opens a `khepri://` link, signs out.
+- [ ] `./gradlew check` is green locally and in CI; `./gradlew syncContract --check` is green locally.
+- [ ] Every gate in Task 2 was shown to fail on a deliberate violation.
+- [ ] Contract tests decode every committed golden fixture.
+- [ ] `CLAUDE.md` "Commands" section lists the real commands.
+- [ ] Known Phase 1 limitation recorded in `CLAUDE.md`: offline cold launch shows `Failed` until the Phase 2 cache exists.
