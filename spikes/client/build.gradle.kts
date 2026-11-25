@@ -97,13 +97,14 @@ val generateClient by tasks.registering(GenerateTask::class) {
     generateApiDocumentation.set(false)
     generateModelDocumentation.set(false)
     ignoreFileOverride.set(layout.projectDirectory.file("openapi-generator-ignore").asFile.absolutePath)
-    enumNameMappings.set(mapOf("" to "EMPTY"))
+    enumNameMappings.set(mapOf("" to "EMPTY", "unknown_default_open_api" to "UNKNOWN"))
     typeMappings.set(
         mapOf(
             "DateTime" to "java.time.Instant",
             "AnyType" to "JsonElement",
             "object" to "JsonObject",
             "number" to "kotlin.Double",
+            "URI" to "kotlin.String",
         )
     )
     importMappings.set(
