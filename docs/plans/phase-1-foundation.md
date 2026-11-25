@@ -400,10 +400,10 @@ class SessionManager(
 - `SessionManager` collects `UnauthorizedSignal.events` in `scope` and calls `signOut(Unauthorized)`, ignoring events while the phase is already `SignedOut` (concurrent 401s run sign-out once).
 - `:app` calls `retry()` while `Locked` on each `ProcessLifecycleOwner` `ON_START` and on `Intent.ACTION_USER_UNLOCKED`, as iOS retries when protected data becomes available.
 
-- [ ] **Step 1:** `SessionStoreTest` (Robolectric, fake `TokenCipher` that XORs): write then read returns the same session; clear then read returns null; a cipher that throws on decrypt makes `read()` throw `TokenUnreadableException` and the data is still there afterwards.
-- [ ] **Step 2:** Implement `SessionStore` on DataStore. `KeystoreTokenCipherTest` is an instrumented test (emulator): round trip; it is not part of `check` and runs in the Phase 6 device suite.
-- [ ] **Step 3:** `StoredTokenSourceTest`: returns the stored token; null when signed out; propagates `TokenUnreadableException`; `onUnauthorized()` posts to the signal.
-- [ ] **Step 4:** `SessionManagerTest` with fakes. iOS `AppModelTests` has four cases (three locked cases, one with no session); port those, and add the rest:
+- [x] **Step 1:** `SessionStoreTest` (Robolectric, fake `TokenCipher` that XORs): write then read returns the same session; clear then read returns null; a cipher that throws on decrypt makes `read()` throw `TokenUnreadableException` and the data is still there afterwards.
+- [x] **Step 2:** Implement `SessionStore` on DataStore. `KeystoreTokenCipherTest` is an instrumented test (emulator): round trip; it is not part of `check` and runs in the Phase 6 device suite.
+- [x] **Step 3:** `StoredTokenSourceTest`: returns the stored token; null when signed out; propagates `TokenUnreadableException`; `onUnauthorized()` posts to the signal.
+- [x] **Step 4:** `SessionManagerTest` with fakes. iOS `AppModelTests` has four cases (three locked cases, one with no session); port those, and add the rest:
   - no session → `SignedOut`
   - session, `onboardingComplete` = false → `Onboarding`; true → `SignedIn`
   - session, `/me` network error → `Failed`; `retry()` re-runs and reaches `SignedIn`
@@ -415,7 +415,15 @@ class SessionManager(
   - a failing `beforeLogout()` or `logout()` does not stop the local clear
   - an `expiresAt` in the past does not sign out by itself
   - `signedIn` (the `SignedInState` flow) is true exactly while the phase is `SignedIn`
-- [ ] **Step 5:** Implement. `SessionModule` binds `StoredTokenSource` as `TokenSource`, `SessionManager` as `SessionGateway` and `SignedInState`, and `SessionRemoteImpl` (which wraps the generated calls with `apiCall`). Run; expect PASS. Commit.
+- [x] **Step 5:** Implement. `SessionModule` binds `StoredTokenSource` as `TokenSource`, `SessionManager` as `SessionGateway` and `SignedInState`, and `SessionRemoteImpl` (which wraps the generated calls with `apiCall`). Run; expect PASS. Commit.
+
+Done 2026-11-25 (22 tests, plus the device-only `KeystoreTokenCipherTest`). Deviations:
+- `SessionStoreTest` runs on the plain JVM: `DataStoreSessionStore` takes a `DataStore<Preferences>`, so the test builds one on a temp file and needs no Robolectric. It also checks that the token is not stored in the clear.
+- A key that is gone for good (missing alias, or `AEADBadTagException`) throws `SealedDataLostException`. The store drops that data and reads as signed out, so a lost key cannot leave the user `Locked` forever. Every other cipher failure is `TokenUnreadableException`, and the data stays.
+- `SessionManager` runs every transition under one `Mutex`. A 401 on `/me` signs out through the same path as the signal, and a signal that arrives while already `SignedOut` is ignored. The signal collector subscribes with `UNDISPATCHED` in `init`, so a 401 posted before the first suspension is not lost.
+- `:app` has `SessionLifecycle`, which calls `start()` at launch and `retry()` while `Locked` on `ON_START` and on `ACTION_USER_UNLOCKED`. It was smoke-launched on the emulator with no crash.
+- Sign-out clearing the tab stores (amendment) is a `SignOutCleaner` that `:core:navigation` registers in Task 9. `afterLogout` runs before the phase becomes `SignedOut`.
+- `KeystoreTokenCipherTest` still needs `androidx.test:runner` (not yet approved) to run on a device. That waits for the Phase 6 device suite.
 
 ### Task 8: `:core:designsystem`, `:core:ui`, `:core:testing`
 

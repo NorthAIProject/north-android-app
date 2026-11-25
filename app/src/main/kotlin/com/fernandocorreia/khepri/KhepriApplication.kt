@@ -1,6 +1,16 @@
 package com.fernandocorreia.khepri
 
 import android.app.Application
+import com.fernandocorreia.khepri.session.SessionLifecycle
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 
-@HiltAndroidApp class KhepriApplication : Application()
+@HiltAndroidApp
+class KhepriApplication : Application() {
+    @Inject lateinit var session: SessionLifecycle
+
+    override fun onCreate() {
+        super.onCreate()
+        session.install(this)
+    }
+}

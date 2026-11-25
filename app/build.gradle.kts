@@ -29,6 +29,10 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:network"))
+    implementation(project(":core:datastore"))
+    implementation(project(":core:session"))
+    implementation(libs.lifecycle.process)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.activity.compose)
     testImplementation(libs.hilt.android.testing)
