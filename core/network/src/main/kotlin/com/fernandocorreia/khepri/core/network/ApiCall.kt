@@ -36,7 +36,7 @@ private suspend fun <T, R> run(block: suspend () -> Response<T>, success: (Respo
         Outcome.Err(AppError.InvalidResponse)
     }
 
-private fun IOException.isInterruption(): Boolean =
+internal fun IOException.isInterruption(): Boolean =
     this is SocketTimeoutException ||
         this is ConnectException ||
         this is UnknownHostException ||

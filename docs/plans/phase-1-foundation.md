@@ -336,10 +336,17 @@ class SseClient @Inject constructor(@StreamingClient client: OkHttpClient) {
 class UriRequestBody(resolver: ContentResolver, uri: Uri, contentType: MediaType) : RequestBody()
 ```
 
-- [ ] **Step 1:** `SseClientTest`: a body of `event: token\ndata: {"text":"Hi"}\n\n: ping\n\nevent: done\ndata: {}\n\n` yields two events (`token`, `done`) and completes; comments are skipped; a 403 with an error envelope fails with `SseException(Refused(…))`; cancelling the collector closes the connection.
-- [ ] **Step 2:** Run; expect failure. Implement on the OkHttp SSE artefact with `callbackFlow`. Run; expect PASS.
-- [ ] **Step 3:** `UriRequestBodyTest` (Robolectric, a temp file URI): streams the bytes; reports `contentLength()` when the resolver knows it, `-1` otherwise.
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** `SseClientTest`: a body of `event: token\ndata: {"text":"Hi"}\n\n: ping\n\nevent: done\ndata: {}\n\n` yields two events (`token`, `done`) and completes; comments are skipped; a 403 with an error envelope fails with `SseException(Refused(…))`; cancelling the collector closes the connection.
+- [x] **Step 2:** Run; expect failure. Implement on the OkHttp SSE artefact with `callbackFlow`. Run; expect PASS.
+- [x] **Step 3:** `UriRequestBodyTest` (Robolectric, a temp file URI): streams the bytes; reports `contentLength()` when the resolver knows it, `-1` otherwise.
+- [x] **Step 4:** Commit.
+
+Done 2026-11-25 (9 tests). Deviations:
+- `SseException` carries the cause. A stream that fails before a response maps like `apiCall`: an unreadable token is `Locked` and an `IOException` is `Network`.
+- `SseClient` sets `Accept: text/event-stream`, so `RetryInterceptor` never retries it.
+- `UriRequestBody` reads the length from `openAssetFileDescriptor` and reopens the stream on every `writeTo`.
+- Robolectric tests in JUnit 5 modules run on `junit-vintage-engine`. It comes from the approved JUnit BOM and has no separate version.
+- Also added `RetrofitStackTest`, which drives the production client stack through Retrofit's async suspend path. It checks that an unreadable token is `Locked` with nothing sent, that a 401 signs out, that query enums use their wire value and that an undecodable body is `InvalidResponse`.
 
 ### Task 7: `:core:datastore` and `:core:session`
 

@@ -9,9 +9,13 @@ dependencies {
     implementation(project(":core:api"))
     implementation(libs.okhttp)
     implementation(libs.retrofit)
+    implementation(libs.okhttp.sse)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.test.ext.junit)
+    testRuntimeOnly(libs.robolectric)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
