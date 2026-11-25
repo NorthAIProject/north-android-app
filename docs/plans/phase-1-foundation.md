@@ -266,7 +266,7 @@ suspend fun apiCallUnit(block: suspend () -> Response<Unit>): Outcome<Unit>   //
 - Two OkHttp clients sharing one connection pool: default (connect 15 s, read 60 s) and streaming (read timeout none). Interceptors on both, outermost first: `LanguageInterceptor`, `BearerInterceptor`, `LongCallInterceptor` (default client only), `RetryInterceptor`. Retrofit at `"$apiBaseUrl/api/v1/"` on the default client, with `ApiJson.default`.
 - `PreferredLanguages` default implementation reads `LocaleListCompat.getAdjustedDefault()`; tests inject a list.
 
-- [ ] **Step 1:** Write `BearerInterceptorTest` (MockWebServer):
+- [x] **Step 1:** Write `BearerInterceptorTest` (MockWebServer):
   - `adds the token to a protected path`: header is `Bearer t0ken`.
   - `sends no token to a public path`: `POST /api/v1/auth/login` has no `Authorization`.
   - `logout carries the token`.
@@ -274,17 +274,17 @@ suspend fun apiCallUnit(block: suspend () -> Response<Unit>): Outcome<Unit>   //
   - `401 on a public path does not call onUnauthorized`.
   - `401 when signed out does not call onUnauthorized`.
   - `unreadable token stops the request`: `token()` throws; the server receives nothing; the call fails with `TokenUnreadableException`; `onUnauthorized` is not called.
-- [ ] **Step 2:** Run; expect failure. Implement (look up the entry with `OperationIndex.find`). Run; expect PASS.
-- [ ] **Step 3:** `LanguageInterceptorTest`: `["pt-PT","en","es","fr"]` → `pt-PT, en;q=0.9, es;q=0.8`; a request that already has the header is unchanged; an empty list adds nothing.
-- [ ] **Step 4:** `LongCallInterceptorTest`: `POST /api/v1/training/plans` proceeds with a 300 s read timeout; `GET /api/v1/today` keeps 60 s.
-- [ ] **Step 5:** `RetryInterceptorTest`:
+- [x] **Step 2:** Run; expect failure. Implement (look up the entry with `OperationIndex.find`). Run; expect PASS.
+- [x] **Step 3:** `LanguageInterceptorTest`: `["pt-PT","en","es","fr"]` → `pt-PT, en;q=0.9, es;q=0.8`; a request that already has the header is unchanged; an empty list adds nothing.
+- [x] **Step 4:** `LongCallInterceptorTest`: `POST /api/v1/training/plans` proceeds with a 300 s read timeout; `GET /api/v1/today` keeps 60 s.
+- [x] **Step 5:** `RetryInterceptorTest`:
   - `GET is retried once after a dropped connection` (first response `DISCONNECT_AT_START`, second 200): 2 requests.
   - `GET is not retried twice`: two drops → failure, 2 requests.
   - `POST is never retried`: 1 request.
   - `an event stream is never retried`: `Accept: text/event-stream`, 1 request.
   - `a 500 is not retried`.
   - The delay is injected; production value 500 ms.
-- [ ] **Step 6:** `ApiCallTest`, in the iOS order:
+- [x] **Step 6:** `ApiCallTest`, in the iOS order:
 
 | Response | Expected |
 |---|---|
@@ -305,8 +305,17 @@ suspend fun apiCallUnit(block: suspend () -> Response<Unit>): Outcome<Unit>   //
 | `TokenUnreadableException` | `Locked` |
 | 200 with undecodable body | `InvalidResponse` |
 
-- [ ] **Step 7:** Implement `apiCall`, `apiCallUnit` and `ErrorEnvelope`. Run; expect PASS.
-- [ ] **Step 8:** `NetworkModule` provides both clients, `Retrofit`, and each generated interface (`retrofit.create(...)`). Commit.
+- [x] **Step 7:** Implement `apiCall`, `apiCallUnit` and `ErrorEnvelope`. Run; expect PASS.
+- [x] **Step 8:** `NetworkModule` provides both clients, `Retrofit`, and each generated interface (`retrofit.create(...)`). Commit.
+
+Done 2026-11-25 (35 tests). Deviations:
+- `PreferredLanguages` reads `android.os.LocaleList.getAdjustedDefault()` (API 24, below minSdk 28), so `:core:network` needs no appcompat.
+- The language and long-call tests share one file, `LanguageAndLongCallTest`.
+- Both clients set `retryOnConnectionFailure(false)`, so `RetryInterceptor` is the only retry. It does not retry a cancelled call.
+- `ApiServices` creates each generated interface once (`services.create<TrainingApi>()`); data modules bind the interfaces they use instead of `NetworkModule` providing all 68.
+- `apiCall` also maps `IllegalArgumentException` (thrown by the converters, for example on `UNKNOWN`) to `InvalidResponse`.
+- `khepri.hilt` no longer adds `hilt-android-testing` to every module; `:app` declares it. Dependency analysis ignores `hilt-android` as unused, because Hilt modules reach it only through generated code.
+- Android library modules run JUnit 5 for unit tests.
 
 ### Task 6: `:core:network` — SSE and multipart helpers
 

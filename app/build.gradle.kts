@@ -31,4 +31,5 @@ dependencies {
     implementation(project(":core:common"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.activity.compose)
+    testImplementation(libs.hilt.android.testing)
 }

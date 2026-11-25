@@ -19,7 +19,7 @@ rootProject.name = "khepri"
 
 include(":app")
 
-include(":core:model", ":core:common", ":core:api")
+include(":core:model", ":core:common", ":core:api", ":core:network")
 
 include(":detekt-rules")
 

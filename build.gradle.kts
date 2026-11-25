@@ -33,6 +33,7 @@ dependencyAnalysis {
             onAny { severity("fail") }
             onUsedTransitiveDependencies { severity("ignore") }
             onIncorrectConfiguration { severity("ignore") }
+            onUnusedDependencies { exclude("com.google.dagger:hilt-android") }
         }
     }
     structure { bundle("junit-jupiter") { includeGroup("org.junit.jupiter") } }

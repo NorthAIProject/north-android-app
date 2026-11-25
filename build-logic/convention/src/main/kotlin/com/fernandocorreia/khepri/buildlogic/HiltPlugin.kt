@@ -12,7 +12,6 @@ class HiltPlugin : Plugin<Project> {
             dependencies {
                 add("implementation", lib("hilt-android"))
                 add("ksp", lib("hilt-compiler"))
-                add("testImplementation", lib("hilt-android-testing"))
                 add("kspTest", lib("hilt-compiler"))
             }
         }
