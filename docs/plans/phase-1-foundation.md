@@ -83,13 +83,15 @@ Failure modes most likely to bite. Each has a test in the task that owns the cod
 - Produces: the plugin ids above. `khepri.core` = library + explicit API mode. `khepri.feature.domain` = `khepri.kotlin.jvm` + `:core:model`, `:core:common`. `khepri.feature.data` = library + hilt + own `:domain`, `:core:model`, `:core:common`, `:core:api`, `:core:network` (`:core:database`, `:core:datastore` added per module). `khepri.feature.ui` = library + compose + hilt + own `:domain`, `:core:ui`, `:core:designsystem`, `:core:navigation` (`:core:charts`, `:core:scene3d`, `:core:speech` added per module).
 - Produces: `@ApiBaseUrl` qualifier (declared in `:core:common`, Task 3) provided by `:app`'s `AppConfigModule` from `BuildConfig.API_BASE_URL`. This is how library modules get the URL; they never read `:app`'s `BuildConfig`.
 
-- [ ] **Step 1:** Create the wrapper, settings, version catalog and `build-logic` with the plugin classes.
-- [ ] **Step 2:** Create `:app` with a Compose `MainActivity` showing `stringResource(R.string.app_name)`. Edge-to-edge enabled.
-- [ ] **Step 3:** Debug build type: `applicationIdSuffix ".debug"`, `buildConfigField API_BASE_URL "http://10.0.2.2:8090"`. Release: `"https://kheprios.com"`, R8 full mode. The manifest references `@xml/network_security_config`; the debug source set overrides it.
-- [ ] **Step 4:** Backup and data-extraction rules exclude `databases/` and `datastore/`.
-- [ ] **Step 5:** Run `./gradlew :app:assembleDebug :app:assembleRelease`. Expected: BUILD SUCCESSFUL.
-- [ ] **Step 6:** Install on an emulator; the app opens and shows "Khepri".
-- [ ] **Step 7:** Commit.
+- [x] **Step 1:** Create the wrapper, settings, version catalog and `build-logic` with the plugin classes.
+- [x] **Step 2:** Create `:app` with a Compose `MainActivity` showing `stringResource(R.string.app_name)`. Edge-to-edge enabled.
+- [x] **Step 3:** Debug build type: `applicationIdSuffix ".debug"`, `buildConfigField API_BASE_URL "http://10.0.2.2:8090"`. Release: `"https://kheprios.com"`, R8 full mode. The manifest references `@xml/network_security_config`; the debug source set overrides it.
+- [x] **Step 4:** Backup and data-extraction rules exclude `databases/` and `datastore/`.
+- [x] **Step 5:** Run `./gradlew :app:assembleDebug :app:assembleRelease`. Expected: BUILD SUCCESSFUL.
+- [x] **Step 6:** Install on an emulator; the app opens and shows "Khepri".
+- [x] **Step 7:** Commit.
+
+Done 2026-11-25. Deviations: `khepri.room` is added in Phase 2 with `:core:database` (Room is not approved yet); `di/AppConfigModule.kt` is added in Task 3 with the `@ApiBaseUrl` qualifier it provides; a `khepri.screenshot` plugin (Robolectric + Roborazzi, references in `src/test/screenshots`) was added so `khepri.feature.ui` and `:app` share it. Hilt, KSP, Robolectric (Android 17 image) and Roborazzi all build and run on AGP 9.5.2 with compileSdk 37.1.
 
 ### Task 2: Quality gates, CI and pre-commit
 

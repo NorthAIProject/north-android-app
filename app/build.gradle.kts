@@ -1,0 +1,33 @@
+plugins {
+    id("khepri.android.application")
+    id("khepri.compose")
+    id("khepri.hilt")
+    id("khepri.screenshot")
+}
+
+android {
+    namespace = "com.fernandocorreia.khepri"
+    defaultConfig {
+        applicationId = "com.fernandocorreia.khepri"
+        versionCode = 1
+        versionName = "0.1.0"
+    }
+    buildFeatures { buildConfig = true }
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8090\"")
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "API_BASE_URL", "\"https://kheprios.com\"")
+        }
+    }
+}
+
+dependencies {
+    implementation(libs.activity.compose)
+    implementation(libs.lifecycle.runtime.compose)
+}

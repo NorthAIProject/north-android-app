@@ -1,0 +1,17 @@
+package com.fernandocorreia.khepri.buildlogic
+
+import com.android.build.api.dsl.LibraryExtension
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.kotlin.dsl.configure
+
+class AndroidLibraryPlugin : Plugin<Project> {
+    override fun apply(target: Project) = with(target) {
+        pluginManager.apply("com.android.library")
+        extensions.configure<LibraryExtension> {
+            configureAndroid()
+            namespace = "com.fernandocorreia.khepri" + path.replace(':', '.')
+        }
+        configureKotlin()
+    }
+}
