@@ -18,10 +18,9 @@ class ScreenshotPlugin : Plugin<Project> {
                 outputDir.set(layout.projectDirectory.dir("src/test/screenshots"))
             }
             dependencies {
-                add("testImplementation", lib("robolectric"))
+                add("testRuntimeOnly", lib("robolectric"))
+                add("testImplementation", lib("robolectric-annotations"))
                 add("testImplementation", lib("roborazzi"))
-                add("testImplementation", lib("roborazzi-compose"))
-                add("testImplementation", lib("roborazzi-junit-rule"))
                 add("testImplementation", lib("androidx-test-ext-junit"))
             }
         }

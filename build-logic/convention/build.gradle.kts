@@ -29,6 +29,7 @@ gradlePlugin {
         add("khepri.hilt", "HiltPlugin")
         add("khepri.screenshot", "ScreenshotPlugin")
         add("khepri.core", "CorePlugin")
+        add("khepri.core.jvm", "CoreJvmPlugin")
         add("khepri.feature.domain", "FeatureDomainPlugin")
         add("khepri.feature.data", "FeatureDataPlugin")
         add("khepri.feature.ui", "FeatureUiPlugin")

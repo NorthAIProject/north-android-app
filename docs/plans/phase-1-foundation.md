@@ -120,6 +120,7 @@ Done 2026-11-25. Deviations:
 - detekt is 2.0.0-alpha.6 (owner's choice; compose-rules 0.6.8 needs it). Its `UnsafeCallOnNullableType` needs type resolution, which the `detekt` task does not run, so `!!` is caught by our own `NoNotNullAssertion` rule.
 - `assertModuleGraph` is our own task (`ModuleGraphPlugin`): an allowlist of `from -> to` patterns with back-references, plus a transitive check that no `feature:x:ui` reaches `data`, `:core:api`, `:core:network` or `:core:session`. The jraska plugin was approved but is not used.
 - Lint skips test sources: lint 9.5 crashes on Kotlin 2.4 test files (FIR resolve error). Re-check when AGP updates.
+- `buildHealth` fails on unused dependencies and on runtime-only misuse. It ignores "declare this transitive dependency" advice (Compose and Dagger would need dozens of uncatalogued coordinates) and api-versus-implementation advice (design 6.1: every module edge is `implementation`). The dependency-analysis plugin must be applied in each module, not only the root, or it analyses nothing.
 - Lint required a launcher icon. A placeholder adaptive icon (Solar Gold disc on Armor Navy) stands in until the brand emblem is exported for Android.
 - Gates were proven in the working tree and reverted, not on a branch. Each of the five violations failed `check`.
 - detekt keeps its rule set loaded in the Gradle daemon: after changing `build-logic/detekt-rules`, run `./gradlew --stop`.
@@ -180,12 +181,14 @@ class TokenUnreadableException(cause: Throwable? = null) : java.io.IOException(c
 
 - Hilt in `CommonBindings`: `SharedFlowDataChangeBus` as `DataChangeBus` (singleton), `DefaultDispatcherProvider`, `Clock.systemDefaultZone()`, an `@ApplicationScope CoroutineScope` (`SupervisorJob() + Dispatchers.Default`).
 
-- [ ] **Step 1:** Write `DataChangeBusTest`: `changed(Day)` is received by two active collectors; a collector that subscribes after the emission does not receive it; `changed` called with no collector returns immediately and does not throw.
-- [ ] **Step 2:** Run it; expect failure (class missing).
-- [ ] **Step 3:** Implement `SharedFlowDataChangeBus` (`MutableSharedFlow(replay = 0, extraBufferCapacity = 64)`, `tryEmit`).
-- [ ] **Step 4:** Write and pass `OutcomeTest` for `map` on `Ok` and `Err`.
-- [ ] **Step 5:** Add `CommonBindings` to `:app`.
-- [ ] **Step 6:** `./gradlew :core:model:test :core:common:test`. Expected: PASS. Commit.
+- [x] **Step 1:** Write `DataChangeBusTest`: `changed(Day)` is received by two active collectors; a collector that subscribes after the emission does not receive it; `changed` called with no collector returns immediately and does not throw.
+- [x] **Step 2:** Run it; expect failure (class missing).
+- [x] **Step 3:** Implement `SharedFlowDataChangeBus` (`MutableSharedFlow(replay = 0, extraBufferCapacity = 64)`, `tryEmit`).
+- [x] **Step 4:** Write and pass `OutcomeTest` for `map` on `Ok` and `Err`.
+- [x] **Step 5:** Add `CommonBindings` to `:app`.
+- [x] **Step 6:** `./gradlew :core:model:test :core:common:test`. Expected: PASS. Commit.
+
+Done 2026-11-25. Deviations: both modules are plain Kotlin with explicit API mode (new plugin `khepri.core.jvm`); `@ApiBaseUrl` is provided in `CommonBindings` (the Task 1 `AppConfigModule` was folded in); `javax.inject:javax.inject:1` is declared for `@Qualifier` and `@Inject` (it already ships with Hilt); `Session.toString()` leaves out the token so it never reaches a log.
 
 ### Task 4: `:core:api` — contract sync, generation, contract tests
 

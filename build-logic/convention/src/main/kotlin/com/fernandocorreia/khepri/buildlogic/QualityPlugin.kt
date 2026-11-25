@@ -15,6 +15,7 @@ class QualityPlugin : Plugin<Project> {
         with(target) {
             pluginManager.apply("com.diffplug.spotless")
             pluginManager.apply("dev.detekt")
+            pluginManager.apply("com.autonomousapps.dependency-analysis")
             val ktfmt = libs.findVersion("ktfmt").get().requiredVersion
             extensions.configure<SpotlessExtension> {
                 kotlin {

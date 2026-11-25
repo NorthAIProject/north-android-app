@@ -26,6 +26,15 @@ spotless {
     }
 }
 
-dependencyAnalysis { issues { all { onAny { severity("fail") } } } }
+dependencyAnalysis {
+    issues {
+        all {
+            onAny { severity("fail") }
+            onUsedTransitiveDependencies { severity("ignore") }
+            onIncorrectConfiguration { severity("ignore") }
+        }
+    }
+    structure { bundle("junit-jupiter") { includeGroup("org.junit.jupiter") } }
+}
 
 tasks.named("check") { dependsOn("assertModuleGraph", "buildHealth", "spotlessCheck") }

@@ -16,3 +16,12 @@ class CorePlugin : Plugin<Project> {
             extensions.getByType<KotlinProjectExtension>().explicitApi()
         }
 }
+
+/** A pure-Kotlin module under `core/` (`:core:model`, `:core:common`) with explicit API mode. */
+class CoreJvmPlugin : Plugin<Project> {
+    override fun apply(target: Project) =
+        with(target) {
+            pluginManager.apply("khepri.kotlin.jvm")
+            extensions.getByType<KotlinProjectExtension>().explicitApi()
+        }
+}

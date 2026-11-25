@@ -19,6 +19,8 @@ rootProject.name = "khepri"
 
 include(":app")
 
+include(":core:model", ":core:common")
+
 include(":detekt-rules")
 
 project(":detekt-rules").projectDir = file("build-logic/detekt-rules")

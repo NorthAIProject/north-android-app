@@ -28,6 +28,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:common"))
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.activity.compose)
-    implementation(libs.lifecycle.runtime.compose)
 }
