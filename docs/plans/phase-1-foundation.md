@@ -456,6 +456,22 @@ Done 2026-11-25 (11 tests, 26 screenshots). Deviations:
 - `khepri.screenshot` makes `check` depend on `verifyRoborazziDebug` and adds the vintage engine with the JUnit BOM. Dependency analysis treats the roborazzi group as one bundle.
 - `:core:ui` `ErrorState` has its own strings in the four locales ("Offline" and "Try Again" reuse the iOS translations). It is tested with two screenshots and a click.
 
+### Fable review of Tasks 4-7 (2026-11-25)
+
+The owner's rule is a Fable review after every task. This review covered Tasks 4-7. It made 11 findings, and all were fixed in one commit:
+
+1. A storage error at launch crashed the app. The session DataStore now has a `ReplaceFileCorruptionHandler`, any `IOException` in `restore()` moves to `Locked`, and `signedIn` returns `Outcome<Unit>` (`Err(Locked)` when the session cannot be saved; `SessionGateway` changed).
+2. Sign-out could be cancelled halfway when a cleaner tore down the calling ViewModel. Every `SessionManager` transition now runs in the application scope (`scope.async { lock.withLock { } }.await()`). A test cancels the caller from inside a cleaner.
+3. An expired URI grant crashed OkHttp's dispatcher with a `SecurityException`. `UriRequestBody` now turns every open failure into an `IOException`.
+4. The token was sent to any URL. `BearerInterceptor` now sends it only to spec operations on the `@ApiBaseUrl` origin.
+5. Real dropped connections (EOF, stream reset, SSL) were mapped to `interrupted = false`. The rule is now inverted; see design 7.3.
+6. A half-open stream never failed. The streaming client now has a 300 s read timeout, the same as iOS.
+7. A failed body read in `SseClient.onFailure` hung the flow. The read is now wrapped, and a test covers a stream that drops mid-way.
+8. A late 401 for an old token could sign out a new session. `TokenSource.onUnauthorized(sentToken)` now signs out only while that token is still stored.
+9. A 409 with no JSON body became `Server(409)`. A 409 is now always `Conflict`, and an empty `fields` or `code` is ignored, as on iOS.
+10. A key lost mid-run left a signed-in shell sending bare requests. `StoredTokenSource` now posts the signal when a protected request finds no session.
+11. `ApiServices` is now `@Singleton`. The `ACTION_USER_UNLOCKED` receiver was removed: the app is not direct-boot aware, so it never fired, and `ON_START` covers the retry.
+
 ### Task 9: `:core:navigation` — destinations and deep links
 
 **Files:**

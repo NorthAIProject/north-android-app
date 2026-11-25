@@ -2,6 +2,7 @@ package com.fernandocorreia.khepri.core.network
 
 import com.fernandocorreia.khepri.core.common.TokenUnreadableException
 import mockwebserver3.MockWebServer
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -12,9 +13,13 @@ import org.junit.jupiter.api.assertThrows
 class BearerInterceptorTest {
     private val server = MockWebServer()
     private val tokens = FakeTokens()
-    private val client = client(BearerInterceptor(tokens))
+    private lateinit var client: OkHttpClient
 
-    @BeforeEach fun start() = server.start()
+    @BeforeEach
+    fun start() {
+        server.start()
+        client = client(BearerInterceptor(tokens, server.url("/").toString()))
+    }
 
     @AfterEach fun stop() = server.close()
 
@@ -68,5 +73,23 @@ class BearerInterceptorTest {
         assertThrows<TokenUnreadableException> { client.call(server, "GET", "/api/v1/me") }
         assertEquals(0, server.requestCount)
         assertEquals(0, tokens.unauthorized)
+    }
+
+    @Test
+    fun `another origin never gets the token`() {
+        MockWebServer().use { other ->
+            other.start()
+            other.enqueue(status(401))
+            client.call(other, "GET", "/api/v1/me").close()
+            assertNull(other.next()?.headers?.get("Authorization"))
+        }
+        assertEquals(0, tokens.unauthorized)
+    }
+
+    @Test
+    fun `a path outside the API never gets the token`() {
+        server.enqueue(ok())
+        client.call(server, "GET", "/media/photo.jpg").close()
+        assertNull(server.next()?.headers?.get("Authorization"))
     }
 }

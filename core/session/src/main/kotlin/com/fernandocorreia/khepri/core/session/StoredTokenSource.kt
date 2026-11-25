@@ -19,13 +19,17 @@ public class UnauthorizedSignal @Inject constructor() {
     }
 }
 
-/** The only [TokenSource]. */
+/**
+ * The only [TokenSource]. A protected request that finds no session (its sealed data was lost while signed in) also
+ * posts the signal, so the app signs out instead of sending bare requests; the manager ignores it when signed out.
+ */
 public class StoredTokenSource
 @Inject
 constructor(private val store: SessionStore, private val signal: UnauthorizedSignal) : TokenSource {
-    override suspend fun token(): String? = store.read()?.token
+    override suspend fun token(): String? = store.read()?.token.also { if (it == null) signal.post() }
 
-    override fun onUnauthorized() {
-        signal.post()
+    override suspend fun onUnauthorized(sentToken: String) {
+        val current = runCatching { store.read()?.token }.getOrNull()
+        if (current == sentToken) signal.post()
     }
 }

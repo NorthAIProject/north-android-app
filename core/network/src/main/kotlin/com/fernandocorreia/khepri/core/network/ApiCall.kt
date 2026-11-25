@@ -3,11 +3,12 @@ package com.fernandocorreia.khepri.core.network
 import com.fernandocorreia.khepri.core.common.TokenUnreadableException
 import com.fernandocorreia.khepri.core.model.AppError
 import com.fernandocorreia.khepri.core.model.Outcome
+import java.io.FileNotFoundException
 import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
+import java.net.ProtocolException
+import java.net.UnknownServiceException
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.SerializationException
 import retrofit2.Response
@@ -36,8 +37,14 @@ private suspend fun <T, R> run(block: suspend () -> Response<T>, success: (Respo
         Outcome.Err(AppError.InvalidResponse)
     }
 
+/**
+ * True unless the failure proves the connection never carried the request: TLS setup, a refused protocol, or a missing
+ * local file. Dropped pooled connections surface as EOF, stream resets, SSL errors and "unexpected end of stream", and
+ * all of those count as interrupted, as iOS reports `networkConnectionLost`.
+ */
 internal fun IOException.isInterruption(): Boolean =
-    this is SocketTimeoutException ||
-        this is ConnectException ||
-        this is UnknownHostException ||
-        (this is SocketException && message?.contains("reset", ignoreCase = true) == true)
+    this !is SSLHandshakeException &&
+        this !is SSLPeerUnverifiedException &&
+        this !is ProtocolException &&
+        this !is UnknownServiceException &&
+        this !is FileNotFoundException

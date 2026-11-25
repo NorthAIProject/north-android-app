@@ -25,13 +25,17 @@ import retrofit2.Retrofit
 /** Requests and responses with a 60 s read timeout (300 s for long operations). */
 @Qualifier @Retention(AnnotationRetention.BINARY) public annotation class DefaultClient
 
-/** Event streams: no read timeout. Used only by the SSE client. */
+/**
+ * Event streams: 300 s read timeout, as the iOS generation client, so a half-open stream after a network switch still
+ * fails and reconnects. A feature with server pings (crew live, 20 s) sets a shorter per-call timeout.
+ */
 @Qualifier @Retention(AnnotationRetention.BINARY) public annotation class StreamingClient
 
 /**
  * Creates generated Retrofit interfaces, once each. Data modules bind the ones they use:
  * `services.create<TrainingApi>()`.
  */
+@Singleton
 public class ApiServices @Inject constructor(private val retrofit: Retrofit) {
     private val created = ConcurrentHashMap<Class<*>, Any>()
 
@@ -45,6 +49,7 @@ public class ApiServices @Inject constructor(private val retrofit: Retrofit) {
 internal object NetworkModule {
     private val connectTimeout = Duration.ofSeconds(15)
     private val readTimeout = Duration.ofSeconds(60)
+    private val streamReadTimeout = Duration.ofSeconds(300)
 
     @Provides @Singleton fun connectionPool(): ConnectionPool = ConnectionPool()
 
@@ -89,7 +94,7 @@ internal object NetworkModule {
         OkHttpClient.Builder()
             .connectionPool(pool)
             .connectTimeout(connectTimeout)
-            .readTimeout(Duration.ZERO)
+            .readTimeout(streamReadTimeout)
             .retryOnConnectionFailure(false)
             .addInterceptor(language)
             .addInterceptor(bearer)

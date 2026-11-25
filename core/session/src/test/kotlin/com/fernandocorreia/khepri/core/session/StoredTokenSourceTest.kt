@@ -6,6 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -30,14 +31,29 @@ class StoredTokenSourceTest {
         assertThrows<TokenUnreadableException> { source.token() }
     }
 
-    @Test
-    fun `onUnauthorized posts the signal`() = runTest {
+    private suspend fun kotlinx.coroutines.test.TestScope.posts(action: suspend () -> Unit): Boolean {
         var received = false
         val job = launch { signal.events.first().also { received = true } }
         runCurrent()
-        source.onUnauthorized()
+        action()
         runCurrent()
-        assertTrue(received)
         job.cancel()
+        return received
+    }
+
+    @Test
+    fun `a 401 for the stored token posts the signal`() = runTest {
+        assertTrue(posts { source.onUnauthorized("t0ken") })
+    }
+
+    @Test
+    fun `a late 401 for an older token is ignored`() = runTest {
+        assertFalse(posts { source.onUnauthorized("old-token") })
+    }
+
+    @Test
+    fun `a protected request with no session posts the signal`() = runTest {
+        store.stored = null
+        assertTrue(posts { source.token() })
     }
 }

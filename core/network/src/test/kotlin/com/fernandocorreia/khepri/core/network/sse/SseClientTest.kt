@@ -1,23 +1,28 @@
 package com.fernandocorreia.khepri.core.network.sse
 
 import com.fernandocorreia.khepri.core.model.AppError
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
+import mockwebserver3.MockResponseBody
 import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.BufferedSink
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertThrows
 
+@Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class SseClientTest {
     private val server = MockWebServer()
-    private val okHttp = OkHttpClient.Builder().readTimeout(0, TimeUnit.SECONDS).build()
+    private val okHttp = OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build()
     private val sse = SseClient(okHttp)
 
     @BeforeEach fun start() = server.start()
@@ -57,6 +62,26 @@ class SseClientTest {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
         while (okHttp.dispatcher.runningCallsCount() > 0 && System.nanoTime() < deadline) Thread.sleep(POLL_MS)
         assertEquals(0, okHttp.dispatcher.runningCallsCount())
+    }
+
+    @Test
+    fun `a stream that drops mid-way fails as an interrupted network error`() {
+        val body =
+            object : MockResponseBody {
+                override val contentLength: Long = -1
+
+                override fun writeTo(sink: BufferedSink) {
+                    sink.writeUtf8("event: token\ndata: {}\n\n").flush()
+                    throw IOException("dropped")
+                }
+            }
+        server.enqueue(
+            MockResponse.Builder().code(200).setHeader("Content-Type", "text/event-stream").body(body).build()
+        )
+        val seen = mutableListOf<SseEvent>()
+        val failure = assertThrows<SseException> { runBlocking { sse.events(request()).collect { seen += it } } }
+        assertEquals(listOf(SseEvent("token", "{}")), seen)
+        assertEquals(AppError.Network(interrupted = true), failure.error)
     }
 
     private companion object {

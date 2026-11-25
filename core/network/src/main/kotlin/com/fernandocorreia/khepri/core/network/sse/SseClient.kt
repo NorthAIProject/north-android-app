@@ -52,7 +52,8 @@ public class SseClient @Inject constructor(@StreamingClient client: OkHttpClient
 
     private fun failure(t: Throwable?, response: Response?): AppError =
         when {
-            response != null && !response.isSuccessful -> errorFor(response.code, response.body.string())
+            response != null && !response.isSuccessful ->
+                errorFor(response.code, runCatching { response.body.string() }.getOrNull())
             t is TokenUnreadableException -> AppError.Locked
             t is IOException -> AppError.Network(interrupted = t.isInterruption())
             else -> AppError.InvalidResponse

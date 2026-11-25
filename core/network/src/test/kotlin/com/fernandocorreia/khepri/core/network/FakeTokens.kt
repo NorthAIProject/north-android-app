@@ -19,7 +19,7 @@ internal class FakeTokens(var value: String? = "t0ken", var unreadable: Boolean 
         return value
     }
 
-    override fun onUnauthorized() {
+    override suspend fun onUnauthorized(sentToken: String) {
         unauthorized++
     }
 }

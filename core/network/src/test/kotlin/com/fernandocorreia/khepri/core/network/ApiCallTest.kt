@@ -42,6 +42,17 @@ class ApiCallTest {
                 Triple("404", failing(404, envelope), AppError.NotFound("m")),
                 Triple("409 envelope", failing(409, envelope), AppError.Conflict("m", null)),
                 Triple("409 newer plan", failing(409, """{"id":"p1"}"""), AppError.Conflict(null, """{"id":"p1"}""")),
+                Triple("409 no body", failing(409), AppError.Conflict(null, null)),
+                Triple(
+                    "422 empty fields",
+                    failing(422, """{"error":{"message":"m","fields":{}}}"""),
+                    AppError.Server(422, "m", null),
+                ),
+                Triple(
+                    "403 empty code",
+                    failing(403, """{"error":{"message":"m","code":""}}"""),
+                    AppError.Server(403, "m", null),
+                ),
                 Triple(
                     "422 fields",
                     failing(422, """{"error":{"message":"m","fields":{"email":"taken"}}}"""),
@@ -77,7 +88,11 @@ class ApiCallTest {
                 ConnectException() to AppError.Network(interrupted = true),
                 UnknownHostException() to AppError.Network(interrupted = true),
                 SocketException("Connection reset") to AppError.Network(interrupted = true),
-                IOException("other") to AppError.Network(interrupted = false),
+                IOException("unexpected end of stream") to AppError.Network(interrupted = true),
+                java.io.EOFException() to AppError.Network(interrupted = true),
+                javax.net.ssl.SSLException("connection reset") to AppError.Network(interrupted = true),
+                javax.net.ssl.SSLHandshakeException("bad cert") to AppError.Network(interrupted = false),
+                java.io.FileNotFoundException() to AppError.Network(interrupted = false),
                 TokenUnreadableException() to AppError.Locked,
                 SerializationException("bad") to AppError.InvalidResponse,
             )

@@ -11,6 +11,6 @@ class KhepriApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        session.install(this)
+        session.install()
     }
 }

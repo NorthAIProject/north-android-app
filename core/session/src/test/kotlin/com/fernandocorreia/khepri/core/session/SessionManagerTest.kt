@@ -4,6 +4,7 @@ import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.model.AppError
 import com.fernandocorreia.khepri.core.model.Outcome
 import java.time.Instant
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -19,6 +20,7 @@ class SessionManagerTest {
     private val remote = FakeRemote(journal, store)
     private val signal = UnauthorizedSignal()
     private var failBefore = false
+    private var onAfterPush: () -> Unit = {}
 
     private fun TestScope.manager(): SessionManager {
         lateinit var manager: SessionManager
@@ -29,7 +31,7 @@ class SessionManagerTest {
                 remote,
                 signal,
                 setOf(
-                    RecordingCleaner("push", journal, phase, failBefore),
+                    RecordingCleaner("push", journal, phase, failBefore, onAfter = { onAfterPush() }),
                     RecordingCleaner("tabs", journal, phase),
                 ),
                 backgroundScope,
@@ -98,7 +100,7 @@ class SessionManagerTest {
         remote.me = Outcome.Ok(false)
         val manager = manager()
         manager.start()
-        manager.signedIn(session)
+        assertEquals(Outcome.Ok(Unit), manager.signedIn(session))
         assertEquals(listOf("write", "me"), journal.entries)
         assertEquals(AppPhase.Onboarding, manager.phase.value)
     }
@@ -191,6 +193,43 @@ class SessionManagerTest {
         remote.me = Outcome.Ok(true)
         manager.start()
         manager.signOut(SignOutReason.Explicit)
+        assertFalse(manager.signedIn.value)
+    }
+
+    @Test
+    fun `a storage error on launch is Locked, not a crash`() = runTest {
+        store.readFailure = java.io.IOException("disk")
+        val manager = manager()
+        manager.start()
+        assertEquals(AppPhase.Locked, manager.phase.value)
+        store.readFailure = null
+        manager.retry()
+        assertEquals(AppPhase.SignedIn, manager.phase.value)
+    }
+
+    @Test
+    fun `a session that cannot be saved is reported and nothing changes`() = runTest {
+        store.stored = null
+        store.writeFailure = IllegalStateException("keystore")
+        val manager = manager()
+        manager.start()
+        assertEquals(Outcome.Err(AppError.Locked), manager.signedIn(session))
+        assertEquals(AppPhase.SignedOut, manager.phase.value)
+        assertFalse("me" in journal.entries)
+    }
+
+    @Test
+    fun `sign-out finishes even when a cleaner cancels the caller`() = runTest {
+        val manager = manager()
+        manager.start()
+        journal.entries.clear()
+        val caller = launch { manager.signOut(SignOutReason.Explicit) }
+        onAfterPush = { caller.cancel() }
+        caller.join()
+        runCurrent()
+        assertTrue(caller.isCancelled)
+        assertTrue("after:tabs:Explicit:SignedIn" in journal.entries, journal.entries.toString())
+        assertEquals(AppPhase.SignedOut, manager.phase.value)
         assertFalse(manager.signedIn.value)
     }
 }

@@ -5,16 +5,17 @@ import com.fernandocorreia.khepri.core.common.SessionGateway
 import com.fernandocorreia.khepri.core.common.SignOutCleaner
 import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.common.SignedInState
-import com.fernandocorreia.khepri.core.common.TokenUnreadableException
 import com.fernandocorreia.khepri.core.datastore.SessionStore
 import com.fernandocorreia.khepri.core.model.AppError
 import com.fernandocorreia.khepri.core.model.Outcome
 import com.fernandocorreia.khepri.core.model.Session
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +24,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Owns the app phase. Every transition runs under one lock, so a 401 that arrives while the account loads, or several
- * 401s at once, sign out exactly once. A session past its `expiresAt` is kept: a 401 is the only expiry signal.
+ * Owns the app phase. Every transition runs under one lock in the application scope, so a 401 that arrives while the
+ * account loads, or several 401s at once, sign out exactly once, and cancelling the caller (a screen that a sign-out
+ * cleaner tears down) never leaves a transition half done. A session past its `expiresAt` is kept: a 401 is the only
+ * expiry signal.
  */
 @Singleton
 public class SessionManager
@@ -34,7 +37,7 @@ constructor(
     private val remote: SessionRemote,
     signal: UnauthorizedSignal,
     private val cleaners: Set<@JvmSuppressWildcards SignOutCleaner>,
-    @ApplicationScope scope: CoroutineScope,
+    @ApplicationScope private val scope: CoroutineScope,
 ) : SessionGateway, SignedInState {
     private val lock = Mutex()
     private val current = MutableStateFlow<AppPhase>(AppPhase.Launching)
@@ -50,18 +53,27 @@ constructor(
     }
 
     /** Reads the stored session and loads the account to choose the phase. */
-    public suspend fun start(): Unit = lock.withLock { restore() }
+    public suspend fun start(): Unit = transition { restore() }
 
     /** A sign-in screen finished: keep the session, then load the account. */
-    override suspend fun signedIn(session: Session): Unit = lock.withLock {
-        store.write(session)
-        loadAccount()
+    override suspend fun signedIn(session: Session): Outcome<Unit> = transition {
+        val saved =
+            try {
+                store.write(session)
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (@Suppress("TooGenericExceptionCaught") expected: Exception) {
+                false
+            }
+        if (saved) loadAccount()
+        if (saved) Outcome.Ok(Unit) else Outcome.Err(AppError.Locked)
     }
 
-    public suspend fun signOut(reason: SignOutReason): Unit = lock.withLock { endSession(reason) }
+    public suspend fun signOut(reason: SignOutReason): Unit = transition { endSession(reason) }
 
     /** From `Locked`, reads the store again; from `Failed`, reloads the account. Otherwise does nothing. */
-    public suspend fun retry(): Unit = lock.withLock {
+    public suspend fun retry(): Unit = transition {
         when (current.value) {
             AppPhase.Locked -> restore()
             is AppPhase.Failed -> loadAccount()
@@ -69,11 +81,13 @@ constructor(
         }
     }
 
+    private suspend fun <T> transition(block: suspend () -> T): T = scope.async { lock.withLock { block() } }.await()
+
     private suspend fun restore() {
         val session =
             try {
                 store.read()
-            } catch (expected: TokenUnreadableException) {
+            } catch (expected: IOException) {
                 return moveTo(AppPhase.Locked)
             }
         if (session == null) return moveTo(AppPhase.SignedOut)

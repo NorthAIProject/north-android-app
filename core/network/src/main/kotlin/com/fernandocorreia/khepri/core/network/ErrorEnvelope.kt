@@ -29,14 +29,15 @@ internal fun errorFor(status: Int, body: String?): AppError {
     val json = parseObject(body)
     val envelope = parseEnvelope(json)
     val message = envelope?.message
+    val fields = envelope?.fields?.takeIf { it.isNotEmpty() }
+    val code = envelope?.code?.takeIf { it.isNotEmpty() }
     return when {
         status == HTTP_UNAUTHORIZED -> AppError.Unauthorized(message)
         status == HTTP_NOT_FOUND -> AppError.NotFound(message)
-        status == HTTP_CONFLICT && envelope != null -> AppError.Conflict(message, null)
-        status == HTTP_CONFLICT && json != null -> AppError.Conflict(null, body)
-        envelope?.fields != null -> AppError.FieldValidation(message.orEmpty(), envelope.fields)
-        status == HTTP_FORBIDDEN && envelope?.code != null -> AppError.Refused(envelope.code, message)
-        else -> AppError.Server(status, message, envelope?.code)
+        status == HTTP_CONFLICT -> AppError.Conflict(message, body.takeIf { envelope == null && json != null })
+        fields != null -> AppError.FieldValidation(message.orEmpty(), fields)
+        status == HTTP_FORBIDDEN && code != null -> AppError.Refused(code, message)
+        else -> AppError.Server(status, message, code)
     }
 }
 

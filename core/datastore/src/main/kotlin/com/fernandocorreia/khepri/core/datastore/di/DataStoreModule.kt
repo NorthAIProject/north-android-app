@@ -1,7 +1,9 @@
 package com.fernandocorreia.khepri.core.datastore.di
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.fernandocorreia.khepri.core.common.ApplicationScope
 import com.fernandocorreia.khepri.core.datastore.DataStoreSessionStore
@@ -34,7 +36,10 @@ internal abstract class DataStoreModule {
             cipher: TokenCipher,
         ): SessionStore =
             DataStoreSessionStore(
-                PreferenceDataStoreFactory.create(scope = scope + Dispatchers.IO) {
+                PreferenceDataStoreFactory.create(
+                    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+                    scope = scope + Dispatchers.IO,
+                ) {
                     context.preferencesDataStoreFile("session")
                 },
                 cipher,

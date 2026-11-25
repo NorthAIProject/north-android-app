@@ -21,13 +21,17 @@ internal class Journal {
 
 internal class FakeStore(private val journal: Journal, var stored: Session? = null) : SessionStore {
     var locked = false
+    var readFailure: Exception? = null
+    var writeFailure: Exception? = null
 
     override suspend fun read(): Session? {
         if (locked) throw TokenUnreadableException()
+        readFailure?.let { throw it }
         return stored
     }
 
     override suspend fun write(session: Session) {
+        writeFailure?.let { throw it }
         journal += "write"
         stored = session
     }
@@ -59,6 +63,7 @@ internal class RecordingCleaner(
     private val journal: Journal,
     private val phase: () -> AppPhase,
     private val failBefore: Boolean = false,
+    private val onAfter: () -> Unit = {},
 ) : SignOutCleaner {
     override suspend fun beforeLogout() {
         journal += "before:$name"
@@ -67,5 +72,6 @@ internal class RecordingCleaner(
 
     override suspend fun afterLogout(reason: SignOutReason) {
         journal += "after:$name:$reason:${phase()::class.simpleName}"
+        onAfter()
     }
 }
