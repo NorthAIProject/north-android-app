@@ -389,6 +389,12 @@ One generated `OperationIndex` (method, path template, operationId, isPublic, is
 
 Five tabs: Today, Coach, Training, Progress, More. One saved back stack per tab (Navigation 3). Re-selecting a tab pops to its root and reloads. System back pops the stack, then returns to Today, then exits. More carries a badge with the crew unread count. The tab bar is hidden inside a coach thread and in full-screen flows.
 
+How it is built (proven in `docs/spikes/S9-navigation3.md`):
+- Each tab has one `rememberNavBackStack`.
+- Each tab has one `NavDisplay`, under `key(tab)` and a `SaveableStateHolder`.
+- Each tab has one `ViewModelStoreProvider`, held in an activity-scoped ViewModel and passed to `rememberViewModelStoreNavEntryDecorator(provider)`. The default decorator clears every entry's ViewModels on a tab switch.
+- Sheets use our own `BottomSheetSceneStrategy` (Navigation 3 ships only dialogs).
+
 ### 8.3 Destinations
 
 `AppDestination` is a one-to-one port of the iOS enum (`K/khepri/App/AppRouter.swift`):
