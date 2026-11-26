@@ -1,0 +1,45 @@
+# Overrides on top of detekt's default configuration. Zero issues, no baseline: any finding fails the build.
+config:
+  warningsAsErrors: true
+  # Our rule set is not loaded when detekt checks the rule set's own project.
+  excludes: ['khepri']
+
+complexity:
+  LongMethod:
+    allowedLines: 100
+  CyclomaticComplexMethod:
+    ignoreSimpleWhenEntries: true
+
+potential-bugs:
+  UnsafeCallOnNullableType:
+    active: true
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    excludes: ['**/test/**', '**/androidTest/**']
+    ignoreAnnotated: ['Preview']
+  UnusedPrivateFunction:
+    ignoreAnnotated: ['Preview']
+
+khepri:
+  NoHardcodedUiText:
+    active: true
+    excludes: ['**/test/**', '**/androidTest/**']
+  NoNotNullAssertion:
+    active: true
+
+Compose:
+  ModifierMissing:
+    active: true
+  CompositionLocalAllowlist:
+    active: true
+    allowedCompositionLocals:
+      - LocalColors
+      - LocalSpacing
+      - LocalRadii
+      - LocalTextStyles
+      - LocalReduceMotion

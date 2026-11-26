@@ -1,0 +1,90 @@
+{
+  "range": {
+    "key": "week",
+    "label": "Last 7 days",
+    "options": [
+      {
+        "key": "week",
+        "label": "Last 7 days"
+      },
+      {
+        "key": "month",
+        "label": "Last 30 days"
+      }
+    ]
+  },
+  "avgCalories": "2150 kcal",
+  "avgProtein": "140 g",
+  "daysLogged": 5,
+  "entries": 17,
+  "hasGoal": true,
+  "goalCalories": "2300 kcal",
+  "goalProtein": "150 g",
+  "calories": {
+    "labels": [
+      "Mon",
+      "Tue",
+      "Wed"
+    ],
+    "series": [
+      {
+        "label": "Sleep",
+        "values": [
+          7.2,
+          6.8,
+          7.9
+        ]
+      }
+    ]
+  },
+  "macros": [
+    {
+      "label": "Protein",
+      "value": 700
+    },
+    {
+      "label": "Fat",
+      "value": 350
+    },
+    {
+      "label": "Carbs",
+      "value": 1100
+    }
+  ],
+  "hasSplit": true,
+  "highlights": [
+    "Highest: Tuesday, 2400 kcal."
+  ],
+  "hasData": true,
+  "eating": {
+    "hasData": true,
+    "tiles": [
+      {
+        "label": "Average day",
+        "value": "2150 kcal",
+        "note": "140 g protein · 220 g carbs · 70 g fat"
+      }
+    ],
+    "slots": [
+      {
+        "label": "Lunch",
+        "value": "40%",
+        "pct": 40
+      }
+    ],
+    "foods": [
+      {
+        "label": "Oats",
+        "value": "×4",
+        "note": "380 kcal"
+      }
+    ],
+    "notes": [
+      {
+        "label": "Days logged",
+        "value": "5",
+        "note": ""
+      }
+    ]
+  }
+}

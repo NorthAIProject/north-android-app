@@ -1,0 +1,5 @@
+# The OkHttp and Retrofit setup and auth are hand-written (docs/design.md 7.2).
+**/infrastructure/ApiClient.kt
+**/auth/**
+# Never use the generated Json instance (it encodes defaults and ignores unknown keys); ApiJson replaces it.
+**/infrastructure/Serializer.kt

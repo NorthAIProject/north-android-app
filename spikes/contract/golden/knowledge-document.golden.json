@@ -1,0 +1,20 @@
+{
+  "id": "c9c9c9c9-c9c9-c9c9-c9c9-c9c9c9c9c9c9",
+  "title": "Marathon plan.md",
+  "kind": "upload",
+  "mime": "text/markdown",
+  "byteSize": 4210,
+  "status": "ready",
+  "indexedAt": "2026-09-20T10:00:00Z",
+  "createdAt": "2026-09-20T09:59:00Z",
+  "lineCount": 2,
+  "stale": false,
+  "text": "# Marathon plan\nWeek 1: three easy runs.",
+  "headings": [
+    {
+      "level": 1,
+      "text": "Marathon plan",
+      "line": 1
+    }
+  ]
+}

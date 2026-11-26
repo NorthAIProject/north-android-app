@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "minimumReleaseAge": "14 days",
+  "dependencyDashboard": true,
+  "prHourlyLimit": 2,
+  "packageRules": [
+    {
+      "description": "Every new dependency or version needs the owner's approval; never automerge.",
+      "matchPackageNames": ["*"],
+      "automerge": false
+    }
+  ]
+}

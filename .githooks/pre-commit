@@ -1,0 +1,20 @@
+#!/bin/sh
+# Formats staged Kotlin files and runs detekt on the modules they belong to.
+# Enable once per clone: git config core.hooksPath .githooks
+set -e
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.kts?$' || true)
+[ -z "$files" ] && exit 0
+
+./gradlew -q spotlessApply
+echo "$files" | xargs git add
+
+modules=$(echo "$files" | grep -oE '^(app|core/[a-z0-9]+|feature/[a-z0-9]+/[a-z]+|build-logic/detekt-rules)/' | sort -u)
+tasks=""
+for m in $modules; do
+  case "$m" in
+    build-logic/detekt-rules/) tasks="$tasks :detekt-rules:detekt" ;;
+    *) tasks="$tasks :$(echo "${m%/}" | tr / :):detekt" ;;
+  esac
+done
+[ -n "$tasks" ] && ./gradlew -q $tasks
+exit 0

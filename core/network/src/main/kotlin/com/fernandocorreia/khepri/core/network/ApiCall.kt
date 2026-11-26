@@ -1,0 +1,64 @@
+package com.fernandocorreia.khepri.core.network
+
+import com.fernandocorreia.khepri.core.common.TokenUnreadableException
+import com.fernandocorreia.khepri.core.model.AppError
+import com.fernandocorreia.khepri.core.model.Outcome
+import java.io.FileNotFoundException
+import java.io.IOException
+import java.net.ProtocolException
+import java.net.UnknownServiceException
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.serialization.SerializationException
+import retrofit2.Response
+
+/** Runs a generated call and turns every response and failure into an [Outcome]. Nothing throws except cancellation. */
+public suspend fun <T : Any> apiCall(block: suspend () -> Response<T>): Outcome<T> =
+    run(block) { response -> response.body()?.let { Outcome.Ok(it) } ?: Outcome.Err(AppError.InvalidResponse) }
+
+/**
+ * Runs a generated call and maps its body inside the same guard: a mapper that throws on an odd payload gives
+ * [AppError.InvalidResponse], never a crash. Map here, not with `Outcome.map` afterwards.
+ */
+public suspend fun <T : Any, R> apiCall(map: (T) -> R, block: suspend () -> Response<T>): Outcome<R> =
+    run(block) { response -> response.body()?.let { mapped(it, map) } ?: Outcome.Err(AppError.InvalidResponse) }
+
+private fun <T, R> mapped(body: T, map: (T) -> R): Outcome<R> =
+    try {
+        Outcome.Ok(map(body))
+    } catch (@Suppress("TooGenericExceptionCaught") expected: RuntimeException) {
+        Outcome.Err(AppError.InvalidResponse)
+    }
+
+/** For operations that answer 2xx with no body (204). */
+public suspend fun apiCallUnit(block: suspend () -> Response<Unit>): Outcome<Unit> = run(block) { Outcome.Ok(Unit) }
+
+private suspend fun <T, R> run(block: suspend () -> Response<T>, success: (Response<T>) -> Outcome<R>): Outcome<R> =
+    try {
+        val response = block()
+        if (response.isSuccessful) success(response)
+        else Outcome.Err(errorFor(response.code(), response.errorBody()?.use { it.string() }))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (expected: TokenUnreadableException) {
+        Outcome.Err(AppError.Locked)
+    } catch (e: IOException) {
+        Outcome.Err(AppError.Network(interrupted = e.isInterruption()))
+    } catch (expected: SerializationException) {
+        Outcome.Err(AppError.InvalidResponse)
+    } catch (expected: IllegalArgumentException) {
+        Outcome.Err(AppError.InvalidResponse)
+    }
+
+/**
+ * True unless the failure proves the connection never carried the request: TLS setup, a refused protocol, or a missing
+ * local file. Dropped pooled connections surface as EOF, stream resets, SSL errors and "unexpected end of stream", and
+ * all of those count as interrupted, as iOS reports `networkConnectionLost`.
+ */
+internal fun IOException.isInterruption(): Boolean =
+    this !is SSLHandshakeException &&
+        this !is SSLPeerUnverifiedException &&
+        this !is ProtocolException &&
+        this !is UnknownServiceException &&
+        this !is FileNotFoundException

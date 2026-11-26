@@ -16,7 +16,11 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 - One immutable `UiState` per screen as `StateFlow`; user intents through one `onEvent`; one-shot outcomes through an `Effect` channel.
 - A failed refresh keeps what is on screen. A failed save never blanks the screen.
 - Every write use case emits its `DataScope` on `DataChangeBus`. A screen never emits from its own load.
-- Nothing throws across a layer boundary; repositories return `Outcome<T>`.
+- Nothing throws across a layer boundary; repositories return `Outcome<T>`. Map a response with `apiCall(map = { it.toX() }) { ... }` so a mapper that throws becomes `InvalidResponse`; never `apiCall { }.map { }`.
+- Coroutine scopes: a screen's work on `viewModelScope`; work that outlives a screen but belongs to the account on `@AccountScope` (cancelled at sign-out and at the next sign-in); only sign-out and retry on `@ApplicationScope`.
+- Account-bound state held in a singleton (a cache, an in-memory `StateFlow`) registers a `SignOutCleaner` that clears it. Cancelling `@AccountScope` stops work; it does not clear memory.
+- A screen collects its `Effect` channel with `CollectEffects` and reloads on `bus.reloads(scope, ...)`, never on raw `DataChangeBus.changes`.
+- `UiState` lives in a private `MutableStateFlow`. A screen that loads exposes it with `onStart { load() }.stateIn(viewModelScope, WhileSubscribed(5_000), initial)`; a form with no load (sign-in) exposes it as is.
 
 ## Traps
 
@@ -42,4 +46,16 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 
 ## Commands
 
-None yet. Phase 1 adds `./gradlew check` and `./gradlew syncContract --check`.
+- `./gradlew check` runs everything CI runs, including `checkTranslations`, the `tools/` tests, Roborazzi verification, `buildHealth` and `verifyReleaseManifest`.
+- `./gradlew syncContract [--check]` copies the spec, medals and golden fixtures at `core/api/contract.sha` from `../north-client`; `--check` fails if the committed copies differ.
+- `./gradlew :<module>:recordRoborazziDebug` re-records a module's screenshots after an intended visual change.
+- `./gradlew :app:assembleDebug`, `:app:assembleMinified` (release code under R8, debug-signed, local backend) and `:app:assembleRelease`.
+- `maestro/README.md`: the smoke flow against a local backend at the pinned SHA. Never with real credentials or production.
+- `python3 tools/convert_strings.py [--check]` regenerates `core/ui` strings from the iOS catalogs. Never edit the generated `strings.xml`; Android-only copy goes in `tools/strings-android.json`.
+- `python3 tools/sync_theme.py` copies colours from the iOS asset catalog; `python3 tools/emblem_to_vector.py` regenerates the emblem drawables from the web's SVGs.
+
+## Known limitations
+
+- Phase 1: a cold launch with no connection shows the `Failed` screen (Try Again, Sign Out) until the Phase 2 cache exists.
+- An explicit sign-out gives the server steps (push unregister, logout) 5 s, then signs out locally; on a dead network the token stays valid on the server until it expires. iOS waits for the request instead.
+- Local builds (`debug`, `minified`) need `ACCESS_LOCAL_NETWORK` granted on API 37+ to reach `10.0.2.2`; without it calls time out silently.

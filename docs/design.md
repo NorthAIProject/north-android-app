@@ -276,7 +276,7 @@ Rules, taken from iOS conventions:
 - A failed save never blanks the screen; it shows inline and leaves the form filled.
 - `UiState` is exposed with `stateIn(WhileSubscribed(5s))`. Screens reload on first show, pull to refresh, app foreground, tab re-selection, and a change-bus event for their scope.
 - Repositories return a result type; nothing throws across a layer boundary.
-- `AppError` follows iOS `APIError` (`K/NorthKit/Sources/NorthAPI/APIError.swift`) and keeps the server's message wherever iOS does: `Unauthorized(message?)`, `NotFound(message?)`, `Conflict(message?, newerVersionJson?)`, `FieldValidation(message, fields)`, `Server(status, message?, code?)`, `Refused(code, message?)`, `Network(interrupted)`, `Locked`, `InvalidResponse`. `Server` covers iOS `invalidStatus` and carries a code for 5xx refusals such as `import_partial`.
+- `AppError` follows iOS `APIError` (`K/NorthKit/Sources/NorthAPI/APIError.swift`) and keeps the server's message wherever iOS does: `Unauthorized(message?)`, `NotFound(message?)`, `Conflict(message?, newerVersionJson?)`, `FieldValidation(message, fields)`, `Server(status, message?, code?)`, `Refused(code, message?)`, `Network(interrupted)`, `Locked`, `InvalidResponse`. `interrupted` is true for every `IOException` except the ones that prove the request never left (TLS handshake, peer unverified, protocol, unknown service, missing local file), because dropped pooled connections surface as EOF, stream resets and SSL errors. A 409 is always `Conflict`, as on iOS. `Server` covers iOS `invalidStatus` and carries a code for 5xx refusals such as `import_partial`.
 
 ### 6.4 Reload after a write
 
@@ -332,9 +332,11 @@ Clearing:
 - Generator: OpenAPI Generator, Kotlin, Retrofit, kotlinx.serialization, coroutines; run as a Gradle task in `:core:api`; output not committed; template overrides checked in.
 - Spec profile (origin/main 6823e58): no `oneOf`/`anyOf`/discriminators, 59 enums, 21 schemas with `additionalProperties: false` (day, capture and medication inputs only), 9 multipart operations, 15 `allOf` sites, 3 `type: [x, "null"]` sites and 3 `nullable: true` sites. `nullable` has no meaning in 3.1, so normalisation turns both forms into the same nullable field.
 - Every generated model gets the suffix `Dto` (the spec has schemas such as `Outcome` that would clash with domain names).
-- Untagged operations (most of them, including `/me` and `/auth/*`) land in one default interface. S1 records the grouping; domain code never sees it, because `data` modules wrap generated calls.
+- Operations are grouped into interfaces by the first segment of their path (`MeApi`, `AuthApi`, `TrainingApi`; 68 in all), not by spec tag. S1 records the grouping; domain code never sees it, because `data` modules wrap generated calls.
+- Generator traps found in S1 (`docs/spikes/S1-generated-client.md`): quote the YAML 1.1 key `on` before parsing; map `number` → `Double` and `URI` → `String`; never send `UNKNOWN` (wire value `unknown_default_open_api`); group interfaces by first path segment, not spec tag; Retrofit query and path values go through `QueryValueConverterFactory`, or enums are sent upper case.
 - Type mapping: `uuid` → `String`; `date-time` → `Instant` with a serializer that reads RFC 3339 with or without fractional seconds (Go drops the fraction when zero and writes nanoseconds otherwise) and writes with; `date` → `LocalDate`.
-- Enums: every generated enum gets an `UNKNOWN` member; a test asserts it.
+- Enums: every generated enum gets an `UNKNOWN` member; a test asserts it. The client refuses to send `UNKNOWN` (request bodies and query values).
+- Required and nullable request properties are sent as explicit `null` (`HelpfulRequest.helpful`: null clears); optional nulls are left out.
 - Nullable sites: a small spec normalisation step before generation; contract tests assert them.
 - Field names are camelCase except `AIConsent.decided_at` and the capture/agent fields `ingredient_id`, `matched_name`, `check_in`, `amount_ml`.
 - The passkey `publicKey` field is a free-form object; keep it as raw JSON.
@@ -360,7 +362,7 @@ One generated `OperationIndex` (method, path template, operationId, isPublic, is
 - **Errors,** in this order, as iOS checks them: body `{"error":{"message","fields"?,"code"?}}`. 401 → Unauthorized; 404 → NotFound; 409 with the envelope → Conflict; any other status whose envelope has `fields` → FieldValidation (this includes the 429 quota refusal, which carries `fields`); 403 with `code` → Refused; anything else → Server(status, message, code). A non-2xx JSON body that is not the error envelope (a 409 carrying the newer plan) becomes `Conflict(newerVersionJson = body)`, which the repository decodes as the operation's documented type; that is the Android form of iOS passing it through.
 - **Codes to handle** (sent by the server; not all are declared in the spec): `ai_consent_required` (403, `internal/shared/httpx/httpx.go`), `terms_required` and `suspended` (403, `internal/crews/chat_api.go`), `import_partial` (500 with a code, so `Server.code`), `invalid_reset_token`. Also statuses 402 (quota), 413, 422, 429 (`Retry-After: 60` on sign-in routes, `1` on signed-in routes), 503.
 - **Unknown request fields are rejected by the server.** Only 21 schemas say `additionalProperties: false`, so schema validation alone would miss most. The test serialises a fully populated instance of every request type and fails on any key that is not a declared property of its schema, then also validates against the schema.
-- **Clients:** two OkHttp clients sharing one pool: default (60 s read timeout) and streaming (no read timeout, used only by `SseClient`). Long calls stay on the default client; an interceptor raises the read timeout to 300 s with `chain.withReadTimeout` for operations whose `OperationIndex` entry is long.
+- **Clients:** two OkHttp clients sharing one pool: default (60 s read timeout) and streaming (300 s read timeout, as the iOS generation client, so a half-open stream after a network switch fails and reconnects; a stream with server pings, such as crew live every 20 s, sets 60 s per call; used only by `SseClient`). Long calls stay on the default client; an interceptor raises the read timeout to 300 s with `chain.withReadTimeout` for operations whose `OperationIndex` entry is long.
 - **300 s operations:** `createPlan`, `parseWorkoutImport`, `parseMealImport`, `generateMealPlan`, `estimateProgressCheck`, `compareProgressChecks`, `decideToolCalls`, `uploadChatAttachment`.
 - **Long calls in the background:** coach replies, plan approval (1–3 minutes), attachments and crew replies must survive the app going to the background (iOS uses `BackgroundActivity.run`); use expedited work or a short foreground service.
 
@@ -388,6 +390,12 @@ One generated `OperationIndex` (method, path template, operationId, isPublic, is
 ### 8.2 Tabs and stacks
 
 Five tabs: Today, Coach, Training, Progress, More. One saved back stack per tab (Navigation 3). Re-selecting a tab pops to its root and reloads. System back pops the stack, then returns to Today, then exits. More carries a badge with the crew unread count. The tab bar is hidden inside a coach thread and in full-screen flows.
+
+How it is built (proven in `docs/spikes/S9-navigation3.md`):
+- The stacks, the selected tab and the per-tab ViewModel stores live in `NavigationState`, an activity-scoped ViewModel above the phase switch, saved in `SavedStateHandle` (not `rememberNavBackStack`). Commands go through the pure `NavPlanner`; one-shot payloads (start the workout, preset mood, coach draft, crew channel switch, re-select reload) are `ScreenAsk`s consumed once, never route fields.
+- Each tab has one `NavDisplay`, under `key(tab)` and a `SaveableStateHolder`.
+- Each tab has one `ViewModelStoreProvider`, held in `NavigationState` and passed to `rememberViewModelStoreNavEntryDecorator(provider)`. The default decorator clears every entry's ViewModels on a tab switch.
+- Sheets use our own `BottomSheetSceneStrategy` (Navigation 3 ships only dialogs).
 
 ### 8.3 Destinations
 

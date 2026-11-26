@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder until the brand emblem is exported for Android: a Solar Gold sun disc. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#E8B65C"
+        android:pathData="M54,36a18,18 0,1 1,0 36a18,18 0,1 1,0 -36z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#E8B65C"
+        android:strokeWidth="2.5"
+        android:pathData="M54,27a27,27 0,1 1,0 54a27,27 0,1 1,0 -54z" />
+</vector>
