@@ -2,10 +2,13 @@ package com.fernandocorreia.khepri.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import com.fernandocorreia.khepri.core.common.ApplicationScope
 import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.session.AppPhase
 import com.fernandocorreia.khepri.core.session.SessionManager
+import com.fernandocorreia.khepri.feature.auth.domain.usecase.LoadAiConsent
+import com.fernandocorreia.khepri.feature.auth.domain.usecase.ObserveAiConsent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -16,8 +19,16 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AppViewModel
 @Inject
-constructor(private val session: SessionManager, @ApplicationScope private val scope: CoroutineScope) : ViewModel() {
+constructor(
+    private val session: SessionManager,
+    loadConsent: LoadAiConsent,
+    observeConsent: ObserveAiConsent,
+    @ApplicationScope private val scope: CoroutineScope,
+) : ViewModel() {
     val phase: StateFlow<AppPhase> = session.phase
+
+    /** Whether the AI consent question covers the app. */
+    val asksConsent: StateFlow<Boolean> = ConsentGate(phase, observeConsent, loadConsent, viewModelScope).asks
 
     /**
      * The signed-out screens' ViewModels. It outlives rotation and is cleared when those screens leave

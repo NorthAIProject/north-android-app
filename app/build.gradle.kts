@@ -92,6 +92,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:ui"))
     implementation(project(":core:designsystem"))
+    implementation(project(":feature:auth:domain"))
     implementation(project(":feature:auth:ui"))
     implementation(project(":feature:auth:data"))
     implementation(libs.lifecycle.runtime.compose)
@@ -102,6 +103,5 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     testImplementation(libs.hilt.android.testing)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(project(":feature:auth:domain"))
     testImplementation(libs.okhttp)
 }

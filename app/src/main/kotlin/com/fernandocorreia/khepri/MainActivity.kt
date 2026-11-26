@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import com.fernandocorreia.khepri.core.navigation.NavigationState
 import com.fernandocorreia.khepri.core.navigation.Navigator
 import com.fernandocorreia.khepri.core.navigation.ui.EntryInstaller
 import com.fernandocorreia.khepri.core.ui.ProvideReduceMotion
+import com.fernandocorreia.khepri.feature.auth.ui.consent.AiConsentScreen
 import com.fernandocorreia.khepri.feature.auth.ui.navigation.SignedOutRoot
 import com.fernandocorreia.khepri.shell.AppViewModel
 import com.fernandocorreia.khepri.shell.MainTabs
@@ -74,11 +76,18 @@ internal fun AppRoot(
     navigation: NavigationState = hiltViewModel(),
 ) {
     val phase by app.phase.collectAsStateWithLifecycle()
+    val asksConsent by app.asksConsent.collectAsStateWithLifecycle()
     RootContent(
         phase = phase,
         onRetry = app::retry,
         onSignOut = app::signOut,
         signedOut = { ScopedViewModels(app.signedOutStore) { SignedOutRoot() } },
         signedIn = { MainTabs(navigation, installers) },
+        asksConsent = asksConsent,
+        consent = {
+            // Not dismissable, as on iOS: Back does nothing while the question is open.
+            BackHandler {}
+            AiConsentScreen()
+        },
     )
 }

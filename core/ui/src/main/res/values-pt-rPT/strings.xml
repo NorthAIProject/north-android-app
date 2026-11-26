@@ -81,6 +81,7 @@
     <string name="agent">Agente</string>
     <string name="agents">Agentes</string>
     <string name="agents_act_on_your_behalf_with_the_same">Os agentes agem em teu nome com as mesmas ferramentas do treinador. Revoga um para lhe cortar o acesso de imediato.</string>
+    <string name="ai_consent_health_connect">Saúde e condição física: treinos, sono, peso, medidas, nutrição, medicação e os dados que partilhas do Health Connect</string>
     <string name="ai_data_sharing">Partilha de dados com a IA</string>
     <string name="ai_is_off">A IA está desligada</string>
     <string name="ai_provider">Fornecedor de IA</string>

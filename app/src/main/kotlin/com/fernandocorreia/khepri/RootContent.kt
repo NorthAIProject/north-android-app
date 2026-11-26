@@ -18,10 +18,13 @@ import com.fernandocorreia.khepri.core.ui.LocalReduceMotion
 import com.fernandocorreia.khepri.shell.FailedScreen
 import com.fernandocorreia.khepri.shell.LockedScreen
 import com.fernandocorreia.khepri.shell.OnboardingPlaceholder
+import com.fernandocorreia.khepri.shell.coveredByConsent
 
 private const val PHASE_FADE_MS = 250
 
-/** iOS `RootView`: one screen per phase, cross-faded as iOS animates the phase change. */
+/**
+ * iOS `RootView`: one screen per phase, cross-faded as iOS animates the phase change, under the AI consent question.
+ */
 @Composable
 internal fun RootContent(
     phase: AppPhase,
@@ -29,12 +32,28 @@ internal fun RootContent(
     onSignOut: () -> Unit,
     signedOut: @Composable () -> Unit,
     signedIn: @Composable () -> Unit,
+    asksConsent: Boolean,
+    consent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+) {
+    Box(modifier) {
+        Phases(phase, onRetry, onSignOut, signedOut, signedIn)
+        // Over the signed-in app and onboarding only: a sign-out underneath takes the question away with it.
+        if (asksConsent && phase.coveredByConsent()) consent()
+    }
+}
+
+@Composable
+private fun Phases(
+    phase: AppPhase,
+    onRetry: () -> Unit,
+    onSignOut: () -> Unit,
+    signedOut: @Composable () -> Unit,
+    signedIn: @Composable () -> Unit,
 ) {
     val reduceMotion = LocalReduceMotion.current
     AnimatedContent(
         targetState = phase,
-        modifier = modifier,
         transitionSpec = {
             val spec = if (reduceMotion) snap<Float>() else tween(PHASE_FADE_MS)
             fadeIn(spec) togetherWith fadeOut(spec)

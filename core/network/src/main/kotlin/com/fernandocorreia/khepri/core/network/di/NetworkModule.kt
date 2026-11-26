@@ -3,6 +3,7 @@ package com.fernandocorreia.khepri.core.network.di
 import android.os.LocaleList
 import com.fernandocorreia.khepri.core.common.ApiBaseUrl
 import com.fernandocorreia.khepri.core.network.BearerInterceptor
+import com.fernandocorreia.khepri.core.network.ConsentRefusalInterceptor
 import com.fernandocorreia.khepri.core.network.LanguageInterceptor
 import com.fernandocorreia.khepri.core.network.LongCallInterceptor
 import com.fernandocorreia.khepri.core.network.PreferredLanguages
@@ -67,6 +68,7 @@ internal object NetworkModule {
         pool: ConnectionPool,
         language: LanguageInterceptor,
         bearer: BearerInterceptor,
+        consent: ConsentRefusalInterceptor,
         longCall: LongCallInterceptor,
         retry: RetryInterceptor,
     ): OkHttpClient =
@@ -77,6 +79,7 @@ internal object NetworkModule {
             .retryOnConnectionFailure(false)
             .addInterceptor(language)
             .addInterceptor(bearer)
+            .addInterceptor(consent)
             .addInterceptor(longCall)
             .addInterceptor(retry)
             .build()
@@ -88,6 +91,7 @@ internal object NetworkModule {
         pool: ConnectionPool,
         language: LanguageInterceptor,
         bearer: BearerInterceptor,
+        consent: ConsentRefusalInterceptor,
         retry: RetryInterceptor,
     ): OkHttpClient =
         OkHttpClient.Builder()
@@ -97,6 +101,7 @@ internal object NetworkModule {
             .retryOnConnectionFailure(false)
             .addInterceptor(language)
             .addInterceptor(bearer)
+            .addInterceptor(consent)
             .addInterceptor(retry)
             .build()
 

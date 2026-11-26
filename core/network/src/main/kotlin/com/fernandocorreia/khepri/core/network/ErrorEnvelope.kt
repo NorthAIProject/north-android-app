@@ -42,6 +42,6 @@ internal fun errorFor(status: Int, body: String?): AppError {
 }
 
 private const val HTTP_UNAUTHORIZED = 401
-private const val HTTP_FORBIDDEN = 403
+internal const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 private const val HTTP_CONFLICT = 409

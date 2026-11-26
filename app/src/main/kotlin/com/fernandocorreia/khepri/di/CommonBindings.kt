@@ -3,9 +3,11 @@ package com.fernandocorreia.khepri.di
 import com.fernandocorreia.khepri.BuildConfig
 import com.fernandocorreia.khepri.core.common.ApiBaseUrl
 import com.fernandocorreia.khepri.core.common.ApplicationScope
+import com.fernandocorreia.khepri.core.common.ConsentSignal
 import com.fernandocorreia.khepri.core.common.DataChangeBus
 import com.fernandocorreia.khepri.core.common.DefaultDispatcherProvider
 import com.fernandocorreia.khepri.core.common.DispatcherProvider
+import com.fernandocorreia.khepri.core.common.SharedFlowConsentSignal
 import com.fernandocorreia.khepri.core.common.SharedFlowDataChangeBus
 import dagger.Binds
 import dagger.Module
@@ -23,6 +25,8 @@ import kotlinx.coroutines.SupervisorJob
 @InstallIn(SingletonComponent::class)
 internal abstract class CommonBindings {
     @Binds @Singleton abstract fun dataChangeBus(bus: SharedFlowDataChangeBus): DataChangeBus
+
+    @Binds @Singleton abstract fun consentSignal(signal: SharedFlowConsentSignal): ConsentSignal
 
     @Binds abstract fun dispatchers(provider: DefaultDispatcherProvider): DispatcherProvider
 

@@ -30,6 +30,7 @@ class RootContentTest {
 
     private val phase = mutableStateOf<AppPhase>(AppPhase.Launching)
     private val appearance = mutableStateOf(Appearance.Light)
+    private val asksConsent = mutableStateOf(false)
     private var retries = 0
     private var signOuts = 0
 
@@ -43,6 +44,8 @@ class RootContentTest {
                         onSignOut = { signOuts++ },
                         signedOut = { Text("login") },
                         signedIn = { Text("tabs") },
+                        asksConsent = asksConsent.value,
+                        consent = { Text("consent") },
                     )
                 }
             }
@@ -104,5 +107,35 @@ class RootContentTest {
         compose.onNodeWithTag("phase-locked").assertExists()
         compose.onNodeWithText("login").assertDoesNotExist()
         capture("phase_locked_light")
+    }
+
+    @Test
+    fun `the consent question covers the signed-in app and onboarding, and nothing else`() {
+        asksConsent.value = true
+        show()
+        for (covered in listOf(AppPhase.SignedIn, AppPhase.Onboarding)) {
+            phase.value = covered
+            compose.waitForIdle()
+            compose.onNodeWithText("consent").assertExists()
+        }
+        for (open in
+            listOf(
+                AppPhase.SignedOut,
+                AppPhase.Locked,
+                AppPhase.Launching,
+                AppPhase.Failed(AppError.Network(interrupted = false)),
+            )) {
+            phase.value = open
+            compose.waitForIdle()
+            compose.onNodeWithText("consent").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `an answered account sees the app`() {
+        phase.value = AppPhase.SignedIn
+        show()
+        compose.onNodeWithText("tabs").assertExists()
+        compose.onNodeWithText("consent").assertDoesNotExist()
     }
 }

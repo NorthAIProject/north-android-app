@@ -81,6 +81,7 @@
     <string name="agent">Agent</string>
     <string name="agents">Agents</string>
     <string name="agents_act_on_your_behalf_with_the_same">Agents act on your behalf with the same tools the coach has. Revoke one to cut it off at once.</string>
+    <string name="ai_consent_health_connect">Health and fitness: workouts, sleep, weight, measurements, nutrition, medications and data you share from Health Connect</string>
     <string name="ai_data_sharing">AI Data Sharing</string>
     <string name="ai_is_off">AI is off</string>
     <string name="ai_provider">AI Provider</string>

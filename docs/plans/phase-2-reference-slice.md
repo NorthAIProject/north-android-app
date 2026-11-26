@@ -22,6 +22,8 @@ Ask once, at plan handoff:
 
 Task 1 needs no new dependency.
 
+**Answered 2026-11-26:** Room **3.0.3** (`androidx.room3`), Vico **3.3.1** approved, plan approved as written. If Room 3 fails Task 2's compile check, stop and ask before falling back to 2.8.5.
+
 ## Fixed interfaces
 
 ```kotlin
@@ -97,17 +99,19 @@ interface AiConsentRepository {
 - The gate shows when the phase is `SignedIn` or `Onboarding` and the choice is `Unanswered`. It covers the tabs, cannot be dismissed with Back, and has its own `testTagsAsResourceId`.
 - Read first: `K/khepri/Features/AIConsent/AIConsent.swift`, `AIConsentViews.swift`, `K/khepri/khepriApp.swift` (`RootView.asksAIConsent`, load on phase change, reset on sign-out), `K/khepriTests/AIConsentTests.swift`.
 
-- [ ] **Step 1:** `AiConsentRepositoryImplTest` (MockWebServer), the four iOS tests plus three: `unanswered account is asked` (`status: "unset"` → `Unanswered`, recipients kept); `deciding stops the question` (PUT body is exactly `{"decision":"granted"}` → `Allowed`); `a status this build does not know does not ask` (`"paused"` → `Unknown`); `a failed save keeps the question open` (500 → `Err`, still `Unanswered`); `load does nothing once known` (one request for two loads); `a consent refusal reloads and asks only when unset` (signal posted with server `declined` → `Declined`, no gate; with `unset` → `Unanswered`); `sign-out forgets the answer` (`afterLogout` → `Unknown`).
-- [ ] **Step 2:** `ConsentRefusalInterceptorTest`: 403 with the code posts once; 403 with another code, 403 with no body and 200 do not; the response body is still readable by the caller.
-- [ ] **Step 3:** `AiConsentViewModelTest`: Allow and Don't Allow call `DecideAiConsent` once each; buttons disabled while saving; a failed save shows the server message (`AppError.description()`) above the buttons and keeps the screen.
-- [ ] **Step 4:** Implement signal, interceptor, domain, data, ViewModel. Run the three tests; expect PASS.
-- [ ] **Step 5:** `AiConsentScreen` as iOS: title "Share your data with AI?", `AiConsentDisclosure` (intro, "What is sent", "Who receives it" with the server's recipients, own-provider line), bottom bar with Allow (prominent), Don't Allow, footnote. Strings through `convert_strings.py`.
-- [ ] **Step 6:** `AppRoot` overlays the gate; `AppViewModel` calls `LoadAiConsent` when the phase becomes `SignedIn` or `Onboarding`. `RootContentTest`: gate shown over `SignedIn` when `Unanswered`; not shown when `Declined`, `Allowed`, `Unknown` or `SignedOut`; Back does not dismiss it.
-- [ ] **Step 7:** Screenshots: gate light/dark, font scale 2.0, pt-PT, saving, failed save.
-- [ ] **Step 8:** Maestro. `smoke-sign-in.yaml`: after sign-in, `runFlow` when `ai-consent-allow` is visible, tap it. New `ai-consent.yaml`: sign up a fresh account (`smoke+${Date.now()}@example.com`), assert the gate covers the onboarding screen, tap Don't Allow, assert the gate is gone. Run both against the local backend.
-- [ ] **Step 9:** `./gradlew check`; commit.
+- [x] **Step 1:** `AiConsentRepositoryImplTest` (MockWebServer), the four iOS tests plus three: `unanswered account is asked` (`status: "unset"` → `Unanswered`, recipients kept); `deciding stops the question` (PUT body is exactly `{"decision":"granted"}` → `Allowed`); `a status this build does not know does not ask` (`"paused"` → `Unknown`); `a failed save keeps the question open` (500 → `Err`, still `Unanswered`); `load does nothing once known` (one request for two loads); `a consent refusal reloads and asks only when unset` (signal posted with server `declined` → `Declined`, no gate; with `unset` → `Unanswered`); `sign-out forgets the answer` (`afterLogout` → `Unknown`).
+- [x] **Step 2:** `ConsentRefusalInterceptorTest`: 403 with the code posts once; 403 with another code, 403 with no body and 200 do not; the response body is still readable by the caller.
+- [x] **Step 3:** `AiConsentViewModelTest`: Allow and Don't Allow call `DecideAiConsent` once each; buttons disabled while saving; a failed save shows the server message (`AppError.description()`) above the buttons and keeps the screen.
+- [x] **Step 4:** Implement signal, interceptor, domain, data, ViewModel. Run the three tests; expect PASS.
+- [x] **Step 5:** `AiConsentScreen` as iOS: title "Share your data with AI?", `AiConsentDisclosure` (intro, "What is sent", "Who receives it" with the server's recipients, own-provider line), bottom bar with Allow (prominent), Don't Allow, footnote. Strings through `convert_strings.py`.
+- [x] **Step 6:** `AppRoot` overlays the gate; `AppViewModel` calls `LoadAiConsent` when the phase becomes `SignedIn` or `Onboarding`. `RootContentTest`: gate shown over `SignedIn` when `Unanswered`; not shown when `Declined`, `Allowed`, `Unknown` or `SignedOut`; Back does not dismiss it.
+- [x] **Step 7:** Screenshots: gate light/dark, font scale 2.0, pt-PT, saving, failed save.
+- [x] **Step 8:** Maestro. `smoke-sign-in.yaml`: after sign-in, `runFlow` when `ai-consent-allow` is visible, tap it. New `ai-consent.yaml`: sign up a fresh account (`smoke+${Date.now()}@example.com`), assert the gate covers the onboarding screen, tap Don't Allow, assert the gate is gone. Run both against the local backend.
+- [x] **Step 9:** `./gradlew check`; commit.
 
 ---
+
+Done 2026-11-26. Deviation from Step 8: `ai-consent.yaml` signs in a freshly seeded account rather than signing up in the flow, since a new sign-up lands on the Onboarding placeholder until Phase 4; `maestro/README.md` says to seed one per run. The gate swallows Back in `AppRoot` (`:app` has activity-compose), not in the screen.
 
 ### Task 2: `:core:database` and the snapshot cache
 
