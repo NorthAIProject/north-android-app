@@ -12,8 +12,9 @@ public interface SnapshotDao {
 
     @Upsert public suspend fun put(snapshot: CachedSnapshot)
 
-    @Query("DELETE FROM snapshots WHERE accountId = :accountId AND `key` = :key")
-    public suspend fun deleteKey(accountId: String, key: String)
+    /** Deletes the row only if it still holds [json]: a row written since it was read is kept. */
+    @Query("DELETE FROM snapshots WHERE accountId = :accountId AND `key` = :key AND json = :json")
+    public suspend fun deleteIfUnchanged(accountId: String, key: String, json: String)
 
     /** Deletes the account's rows whose key starts with [prefix], except [keep]. */
     @Query(

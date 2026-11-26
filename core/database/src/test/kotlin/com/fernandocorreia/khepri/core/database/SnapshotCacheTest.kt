@@ -2,12 +2,14 @@ package com.fernandocorreia.khepri.core.database
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
+import com.fernandocorreia.khepri.core.common.DispatcherProvider
 import com.fernandocorreia.khepri.core.database.snapshot.CachedSnapshot
 import com.fernandocorreia.khepri.core.database.snapshot.SnapshotCache
 import com.fernandocorreia.khepri.core.database.snapshot.StoredValue
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
@@ -24,8 +26,19 @@ class SnapshotCacheTest {
 
     private val database = testDatabase()
     private val now = Instant.parse("2026-11-26T09:30:00.250Z")
+    private val dispatchers =
+        object : DispatcherProvider {
+            override val main = Dispatchers.Default
+            override val io = Dispatchers.Default
+            override val default = Dispatchers.Default
+        }
     private val cache =
-        SnapshotCache(database.snapshots(), Json { ignoreUnknownKeys = true }, Clock.fixed(now, ZoneOffset.UTC))
+        SnapshotCache(
+            database.snapshots(),
+            Json { ignoreUnknownKeys = true },
+            Clock.fixed(now, ZoneOffset.UTC),
+            dispatchers,
+        )
 
     @After fun close() = database.close()
 
@@ -57,5 +70,16 @@ class SnapshotCacheTest {
                 cache.observe("a", it, Day.serializer()).first() != null
             }
         assertEquals(listOf("day:2026-11-25", "day:2026-11-26", "today"), left)
+    }
+
+    @Test
+    fun `an unreadable row is replaced by the next good write, which is shown`() = runTest {
+        database.snapshots().put(CachedSnapshot("a", "today", "not json", now))
+        cache.observe("a", "today", Day.serializer()).test {
+            assertNull(awaitItem())
+            cache.put("a", "today", Day("2026-11-26", 10), Day.serializer())
+            assertEquals(Day("2026-11-26", 10), awaitItem()?.value)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

@@ -79,4 +79,14 @@ class SnapshotDaoTest {
         dao.deleteWithPrefixExcept("a", "d_y:", emptyList())
         assertEquals(listOf("day:1"), keys("a", "d_y:1", "day:1"))
     }
+
+    @Test
+    fun `deleteIfUnchanged keeps a row rewritten since it was read`() = runTest {
+        dao.put(row("a", "today", "old"))
+        dao.put(row("a", "today", "new"))
+        dao.deleteIfUnchanged("a", "today", "old")
+        assertEquals("new", dao.observe("a", "today").first()?.json)
+        dao.deleteIfUnchanged("a", "today", "new")
+        assertNull(dao.observe("a", "today").first())
+    }
 }

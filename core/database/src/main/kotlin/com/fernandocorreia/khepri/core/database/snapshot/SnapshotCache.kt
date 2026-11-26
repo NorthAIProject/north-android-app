@@ -1,10 +1,13 @@
 package com.fernandocorreia.khepri.core.database.snapshot
 
+import com.fernandocorreia.khepri.core.common.DispatcherProvider
 import com.fernandocorreia.khepri.core.common.WireJson
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -18,9 +21,21 @@ public data class StoredValue<T>(val value: T, val fetchedAt: Instant)
  */
 public class SnapshotCache
 @Inject
-constructor(private val dao: SnapshotDao, @WireJson private val json: Json, private val clock: Clock) {
+constructor(
+    private val dao: SnapshotDao,
+    @WireJson private val json: Json,
+    private val clock: Clock,
+    private val dispatchers: DispatcherProvider,
+) {
+    /**
+     * Emits the stored value and every change to it. Room re-queries on any write to the table, so unchanged rows are
+     * dropped before decoding, and decoding runs off the collector's thread.
+     */
     public fun <T> observe(accountId: String, key: String, serializer: KSerializer<T>): Flow<StoredValue<T>?> =
-        dao.observe(accountId, key).map { row -> row?.let { decode(it, serializer) } }
+        dao.observe(accountId, key)
+            .distinctUntilChanged()
+            .map { row -> row?.let { decode(it, serializer) } }
+            .flowOn(dispatchers.default)
 
     /** Stores [value] as fetched now. */
     public suspend fun <T> put(accountId: String, key: String, value: T, serializer: KSerializer<T>) {
@@ -37,7 +52,7 @@ constructor(private val dao: SnapshotDao, @WireJson private val json: Json, priv
             StoredValue(json.decodeFromString(serializer, row.json), row.fetchedAt)
         } catch (expected: IllegalArgumentException) {
             // Unreadable (SerializationException is an IllegalArgumentException): the next fetch writes a fresh row.
-            dao.deleteKey(row.accountId, row.key)
+            dao.deleteIfUnchanged(row.accountId, row.key, row.json)
             null
         }
 }
