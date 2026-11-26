@@ -17,6 +17,20 @@ import retrofit2.Response
 public suspend fun <T : Any> apiCall(block: suspend () -> Response<T>): Outcome<T> =
     run(block) { response -> response.body()?.let { Outcome.Ok(it) } ?: Outcome.Err(AppError.InvalidResponse) }
 
+/**
+ * Runs a generated call and maps its body inside the same guard: a mapper that throws on an odd payload gives
+ * [AppError.InvalidResponse], never a crash. Map here, not with `Outcome.map` afterwards.
+ */
+public suspend fun <T : Any, R> apiCall(map: (T) -> R, block: suspend () -> Response<T>): Outcome<R> =
+    run(block) { response -> response.body()?.let { mapped(it, map) } ?: Outcome.Err(AppError.InvalidResponse) }
+
+private fun <T, R> mapped(body: T, map: (T) -> R): Outcome<R> =
+    try {
+        Outcome.Ok(map(body))
+    } catch (@Suppress("TooGenericExceptionCaught") expected: RuntimeException) {
+        Outcome.Err(AppError.InvalidResponse)
+    }
+
 /** For operations that answer 2xx with no body (204). */
 public suspend fun apiCallUnit(block: suspend () -> Response<Unit>): Outcome<Unit> = run(block) { Outcome.Ok(Unit) }
 

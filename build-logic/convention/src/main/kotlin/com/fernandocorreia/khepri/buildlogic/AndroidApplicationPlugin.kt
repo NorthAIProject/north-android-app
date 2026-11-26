@@ -16,5 +16,6 @@ class AndroidApplicationPlugin : Plugin<Project> {
                 defaultConfig.targetSdk = TARGET_SDK
             }
             configureKotlin()
+            limitTestTime()
         }
 }

@@ -70,7 +70,7 @@ Same for every module (also at the bottom of each feature spec):
 3. Find contacts: `READ_CONTACTS`, normalise, SHA-256 on the device, send hashes only. Port the contact-matching and phone-number tests first.
 4. Profiles: profile, workouts, awards, workout detail.
 5. Awards: screen, detail sheet, monthly challenge card, coin medals on Canvas from `medals.json` (port the medal tests), unlock celebration full-screen entry.
-6. Crews list, new crew, join by link (`CrewJoin(code)`).
+6. Crews list, new crew, join by link (`CrewJoin(code)`). Any web page can fire a `khepri://` crew link and the code is kept for the next account, so joining by link always shows the crew and asks first (Phase 1 review).
 7. Crew space: chat with channels, replies, reactions, edits, pins, mentions, report, mute; rules sheet before first post (`terms_required`); challenge board.
 8. Room: `crew_pending_message` (clientId) and the relational message cache. Live stream with reconnect 1, 2, 5, 10 s; events trigger refetch only. Port the crew store and live-stream tests.
 9. Unread counts and badges; `CrewChannel` destination, including the "already open" case.

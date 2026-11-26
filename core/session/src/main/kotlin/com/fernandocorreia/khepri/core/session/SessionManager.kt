@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Owns the app phase. Every transition runs under one lock in the application scope, so a 401 that arrives while the
@@ -38,6 +39,7 @@ constructor(
     signal: UnauthorizedSignal,
     private val cleaners: Set<@JvmSuppressWildcards SignOutCleaner>,
     @ApplicationScope private val scope: CoroutineScope,
+    private val accountWork: AccountWork,
 ) : SessionGateway, SignedInState {
     private val lock = Mutex()
     private val current = MutableStateFlow<AppPhase>(AppPhase.Launching)
@@ -60,6 +62,8 @@ constructor(
 
     /** A sign-in screen finished: keep the session, then load the account. */
     override suspend fun signedIn(session: Session): Outcome<Unit> = transition {
+        // Work a screen started after the last sign-out must not run under this account's token.
+        accountWork.end()
         val saved =
             try {
                 store.write(session)
@@ -114,11 +118,18 @@ constructor(
         }
     }
 
+    /**
+     * The server steps of an explicit sign-out share one budget: on a dead network the user is signed out locally after
+     * it, and the token stays valid on the server until it expires. iOS waits for the request instead.
+     */
     private suspend fun endSession(reason: SignOutReason) {
         if (current.value == AppPhase.SignedOut) return
+        accountWork.end()
         if (reason == SignOutReason.Explicit) {
-            cleaners.forEach { bestEffort { it.beforeLogout() } }
-            bestEffort { remote.logout() }
+            withTimeoutOrNull(SERVER_STEPS_MS) {
+                cleaners.forEach { bestEffort { it.beforeLogout() } }
+                bestEffort { remote.logout() }
+            }
         }
         bestEffort { store.clear() }
         userId = null
@@ -139,5 +150,9 @@ constructor(
         } catch (@Suppress("TooGenericExceptionCaught") expected: Exception) {
             Unit
         }
+    }
+
+    private companion object {
+        const val SERVER_STEPS_MS = 5_000L
     }
 }

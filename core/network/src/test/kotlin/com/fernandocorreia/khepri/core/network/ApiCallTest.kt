@@ -29,6 +29,19 @@ class ApiCallTest {
     @Test fun `200 with a body is Ok`() = runTest { assertEquals(Outcome.Ok("x"), apiCall { Response.success("x") }) }
 
     @Test
+    fun `the body is mapped inside the guard, so a mapper that throws is an invalid response`() = runTest {
+        assertEquals(Outcome.Ok(1), apiCall(map = { it.length }) { Response.success("x") })
+        assertEquals(
+            Outcome.Err(AppError.InvalidResponse),
+            apiCall(map = { it.split(",").map(String::toInt) }) { Response.success("x") },
+        )
+        assertEquals(
+            Outcome.Err(AppError.InvalidResponse),
+            apiCall(map = { emptyList<Int>().first() }) { Response.success("x") },
+        )
+    }
+
+    @Test
     fun `204 through apiCallUnit is Ok`() = runTest {
         assertEquals(Outcome.Ok(Unit), apiCallUnit { Response.success(204, Unit) })
     }

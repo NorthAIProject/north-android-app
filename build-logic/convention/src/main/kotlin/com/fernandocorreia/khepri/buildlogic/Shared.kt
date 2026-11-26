@@ -44,3 +44,12 @@ internal fun Project.configureKotlin() {
 }
 
 internal fun Project.androidCommon(): CommonExtension = extensions.getByType<CommonExtension>()
+
+/** Per test task: a Robolectric test idling on an infinite animation hangs forever; fail the task instead of CI. */
+internal const val TEST_TIMEOUT_MINUTES = 10L
+
+internal fun Project.limitTestTime() {
+    tasks.withType(org.gradle.api.tasks.testing.Test::class.java).configureEach {
+        timeout.set(java.time.Duration.ofMinutes(TEST_TIMEOUT_MINUTES))
+    }
+}

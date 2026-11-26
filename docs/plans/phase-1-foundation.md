@@ -743,3 +743,28 @@ Deferred from the Task 12 amendments (Fable item 7):
 - [x] Contract tests decode every committed golden fixture: 164 of 166. The other two, `tools` and `tools.readonly`, are MCP tool lists, not API responses (Task 4).
 - [x] `CLAUDE.md` "Commands" section lists the real commands.
 - [x] Known Phase 1 limitation recorded in `CLAUDE.md`: offline cold launch shows `Failed` until the Phase 2 cache exists.
+
+## Fable review of Phase 1 (2026-11-26)
+
+No High findings. Fixed before Phase 2:
+
+- `apiCall(map = { }) { }` maps the body inside the guard; a mapper that throws is `InvalidResponse`, not a crash. Both callers moved.
+- `@AccountScope` (`AccountWork` in `:core:session`): one `SupervisorJob` scope whose children are cancelled first thing in `endSession` and again at the top of `signedIn`, joined for up to 500 ms. Tests: work stops before the store is cleared; work launched after the next sign-in runs.
+- Explicit sign-out: server steps (cleaners' `beforeLogout`, `logout`) share one 5 s `withTimeoutOrNull`; a hanging logout still reaches `SignedOut` (test). Recorded in `CLAUDE.md` as a known difference from iOS.
+- `verifyReleaseManifest` also checks the main and release network security configs for `cleartextTrafficPermitted="true"` and that the release `API_BASE_URL` is https.
+- Every test task times out after 10 minutes (`limitTestTime()` in build-logic).
+- `DataChangeBus` drops the oldest change when full instead of the newest; `reloads(vararg scopes)` filters and conflates, and is the only way screens should listen.
+- `CollectEffects` in `:core:ui` collects effects only while started; `LoginScreen` uses it.
+- `CLAUDE.md` rules: scope tiers, `SignOutCleaner` for account-bound singleton state, `apiCall(map)`, `CollectEffects`, `reloads`, `MutableStateFlow` + `stateIn(WhileSubscribed)` for loading screens.
+
+Checked and not changed:
+
+- Screenshot threshold (finding 10): Roborazzi 1.79's default validator is `ThresholdValidator(0F)`, so no changed pixel passes; only a 0.007 per-pixel colour distance is tolerated.
+
+Deferred, with where they land:
+
+- Shared screenshot harness in `:core:testing` (locale, font scale, appearance, the Light-first Dark workaround): Phase 2 Task 4 (Today, the first new screen), built from it and the login test rather than guessed from one.
+- Guard test that fails when a repository holds state without a `SignOutCleaner`: Phase 2 Task 3 (`TodayRepository`).
+- Unauthorized signal carrying the token it saw (tens-of-ms window); in-memory token cache in `BearerInterceptor`; `KeystoreTokenCipherTest` on CI (needs an emulator job); Actions pinned by SHA: Phase 6 hardening.
+- Signed-out store missing its clear on a rotation during sign-in: harmless while `LoginViewModel` blanks its state on success; revisit when the signed-out flow gains a second screen.
+- A `khepri://` crew code from any web page is redeemed by the next account: the Phase 3 redeem screen asks before joining.

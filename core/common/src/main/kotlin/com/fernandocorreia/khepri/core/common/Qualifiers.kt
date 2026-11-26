@@ -7,3 +7,11 @@ import javax.inject.Qualifier
 
 /** A scope that lives as long as the process, for work that must outlive a screen. */
 @Qualifier @Retention(AnnotationRetention.BINARY) public annotation class ApplicationScope
+
+/**
+ * A scope for work that outlives a screen but belongs to the signed-in account: a refresh, a multi-step write. Its jobs
+ * are cancelled when the session ends and again when the next one begins, so nothing started for one account finishes
+ * under the next one's token. Sign-out and retry use [ApplicationScope]; a screen's own work uses `viewModelScope`.
+ * Cancelling does not clear state held in memory: account-bound state also registers a `SignOutCleaner`.
+ */
+@Qualifier @Retention(AnnotationRetention.BINARY) public annotation class AccountScope

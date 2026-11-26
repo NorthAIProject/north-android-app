@@ -37,4 +37,45 @@ class DataChangeBusTest {
     fun `a change with no collector returns at once`() {
         repeat(1_000) { bus.changed(DataScope.Training) }
     }
+
+    @Test
+    fun `a slow collector never stops the newest change from arriving`() = runTest {
+        val seen = mutableListOf<DataScope>()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val collector =
+            launch(UnconfinedTestDispatcher(testScheduler)) {
+                bus.changes.collect {
+                    seen += it
+                    gate.await()
+                }
+            }
+        repeat(200) { bus.changed(DataScope.Training) }
+        bus.changed(DataScope.Goals)
+        gate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+        assertEquals(DataScope.Goals, seen.last())
+        collector.cancel()
+    }
+
+    @Test
+    fun `reloads keeps only the wanted scopes and folds a burst into one`() = runTest {
+        var reloads = 0
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val collector =
+            launch(UnconfinedTestDispatcher(testScheduler)) {
+                bus.reloads(DataScope.Day, DataScope.Goals).collect {
+                    reloads++
+                    gate.await()
+                }
+            }
+        bus.changed(DataScope.Social)
+        assertEquals(0, reloads)
+        bus.changed(DataScope.Day)
+        assertEquals(1, reloads)
+        repeat(10) { bus.changed(DataScope.Goals) }
+        gate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+        assertEquals(2, reloads)
+        collector.cancel()
+    }
 }

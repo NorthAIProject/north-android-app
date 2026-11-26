@@ -3,7 +3,6 @@ package com.fernandocorreia.khepri.core.session
 import com.fernandocorreia.khepri.core.api.endpoint.AuthApi
 import com.fernandocorreia.khepri.core.api.endpoint.MeApi
 import com.fernandocorreia.khepri.core.model.Outcome
-import com.fernandocorreia.khepri.core.model.map
 import com.fernandocorreia.khepri.core.network.apiCall
 import com.fernandocorreia.khepri.core.network.apiCallUnit
 import com.fernandocorreia.khepri.core.network.di.ApiServices
@@ -21,10 +20,8 @@ internal class SessionRemoteImpl @Inject constructor(services: ApiServices) : Se
     private val me = services.create<MeApi>()
     private val auth = services.create<AuthApi>()
 
-    override suspend fun onboardingComplete(): Outcome<Boolean> = apiCall {
-        me.getMe()
-    }
-        .map { !it.user.needsOnboarding }
+    override suspend fun onboardingComplete(): Outcome<Boolean> =
+        apiCall(map = { !it.user.needsOnboarding }) { me.getMe() }
 
     override suspend fun logout(): Outcome<Unit> = apiCallUnit { auth.logOut() }
 }

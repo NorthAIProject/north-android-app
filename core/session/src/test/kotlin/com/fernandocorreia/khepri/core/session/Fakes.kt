@@ -45,6 +45,7 @@ internal class FakeStore(private val journal: Journal, var stored: Session? = nu
 internal class FakeRemote(private val journal: Journal, private val store: FakeStore) : SessionRemote {
     var me: Outcome<Boolean> = Outcome.Ok(true)
     var logoutFails = false
+    var logoutHangs = false
 
     override suspend fun onboardingComplete(): Outcome<Boolean> {
         journal += "me"
@@ -53,6 +54,7 @@ internal class FakeRemote(private val journal: Journal, private val store: FakeS
 
     override suspend fun logout(): Outcome<Unit> {
         journal += "logout(token=${store.stored?.token})"
+        if (logoutHangs) kotlinx.coroutines.awaitCancellation()
         if (logoutFails) error("network down")
         return Outcome.Err(AppError.Network(interrupted = false))
     }

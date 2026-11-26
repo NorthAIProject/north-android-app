@@ -25,5 +25,6 @@ class AndroidLibraryPlugin : Plugin<Project> {
                 add("testRuntimeOnly", lib("junit-platform-launcher"))
             }
             tasks.withType<Test>().configureEach { useJUnitPlatform() }
+            limitTestTime()
         }
 }

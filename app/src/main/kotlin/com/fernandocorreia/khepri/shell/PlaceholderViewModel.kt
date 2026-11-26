@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 /**
  * Stands in for a screen not ported yet. It is the pattern every screen ViewModel follows: Hilt, the route as an
  * assisted argument, state in [SavedStateHandle] under the tab's store. [taps] proves that state survives a process
- * kill.
+ * kill. Only sign-out and retry run on [ApplicationScope]; a screen's work runs on `viewModelScope`, and work that must
+ * outlive the screen but belongs to the account runs on `@AccountScope`.
  */
 @HiltViewModel(assistedFactory = PlaceholderViewModel.Factory::class)
 class PlaceholderViewModel

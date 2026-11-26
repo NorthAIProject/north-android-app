@@ -4,6 +4,7 @@ import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.model.AppError
 import com.fernandocorreia.khepri.core.model.Outcome
 import java.time.Instant
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -22,7 +23,10 @@ class SessionManagerTest {
     private var failBefore = false
     private var onAfterPush: () -> Unit = {}
 
+    private lateinit var accountWork: AccountWork
+
     private fun TestScope.manager(): SessionManager {
+        accountWork = AccountWork(backgroundScope)
         lateinit var manager: SessionManager
         val phase = { manager.phase.value }
         manager =
@@ -35,6 +39,7 @@ class SessionManagerTest {
                     RecordingCleaner("tabs", journal, phase),
                 ),
                 backgroundScope,
+                accountWork,
             )
         return manager
     }
@@ -231,5 +236,37 @@ class SessionManagerTest {
         assertTrue("after:tabs:Explicit:SignedIn" in journal.entries, journal.entries.toString())
         assertEquals(AppPhase.SignedOut, manager.phase.value)
         assertNull(manager.account.value)
+    }
+
+    @Test
+    fun `account work stops before the session is cleared, and work for the next account runs`() = runTest {
+        val manager = manager()
+        manager.start()
+        accountWork.scope.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                journal += "account work stopped"
+            }
+        }
+        runCurrent()
+        manager.signOut(SignOutReason.Unauthorized)
+        assertTrue(journal.entries.indexOf("account work stopped") < journal.entries.indexOf("clear"))
+
+        manager.signedIn(session)
+        var ran = false
+        accountWork.scope.launch { ran = true }
+        runCurrent()
+        assertTrue(ran)
+    }
+
+    @Test
+    fun `a sign-out whose server never answers still signs out`() = runTest {
+        remote.logoutHangs = true
+        val manager = manager()
+        manager.start()
+        manager.signOut(SignOutReason.Explicit)
+        assertEquals(AppPhase.SignedOut, manager.phase.value)
+        assertNull(store.stored)
     }
 }

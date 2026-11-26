@@ -16,7 +16,7 @@
 4. **Accessibility audit.** TalkBack through every tab; 48 dp targets; contrast; font scale 200% without clipping; reduce motion; landscape.
 5. **State and lifecycle.** Rotation and process death on every form and sheet ("don't keep activities"); workout killed mid-rest; coach reply interrupted by backgrounding.
 6. **Performance.** Baseline profile (startup, Today scroll, open coach); startup macrobenchmark recorded; R8 full-mode release build passes the Maestro smoke flow.
-7. **Security and privacy.** No secrets in the APK; backup exclusions verified; Coil disk cache off for signed URLs; logs carry no tokens or health values.
+7. **Security and privacy.** From the Phase 1 review: the unauthorized signal carries the token it saw and is re-checked under the session lock; `BearerInterceptor` caches the token in memory; `KeystoreTokenCipherTest` runs on an emulator CI job; GitHub Actions pinned by SHA. No secrets in the APK; backup exclusions verified; Coil disk cache off for signed URLs; logs carry no tokens or health values.
 8. **Contract pin.** `contract.sha` is not ahead of the SHA production runs.
 9. **Play Console.** Data-safety form (email, name, user id, health, fitness, photos/videos, other user content: app functionality only, as the iOS privacy manifest declares); health-permission and foreground-service declarations approved; store listing and screenshots in four languages.
 10. **Release pipeline.** CI uploads to the internal track after `main` is green; closed testing track; a manual gate for production.

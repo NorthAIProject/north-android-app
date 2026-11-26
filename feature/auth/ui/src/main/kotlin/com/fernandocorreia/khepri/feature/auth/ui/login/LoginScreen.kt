@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +32,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriTheme
 import com.fernandocorreia.khepri.core.model.AppError
+import com.fernandocorreia.khepri.core.ui.CollectEffects
 import com.fernandocorreia.khepri.core.ui.LocalReduceMotion
 import com.fernandocorreia.khepri.core.ui.perform
 
@@ -42,12 +42,10 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
     val state by viewModel.state.collectAsStateWithLifecycle()
     val view = LocalView.current
     val autofill = LocalAutofillManager.current
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
-            when (effect) {
-                is LoginEffect.Play -> view.perform(effect.haptic)
-                LoginEffect.CommitAutofill -> autofill?.commit()
-            }
+    CollectEffects(viewModel.effects) { effect ->
+        when (effect) {
+            is LoginEffect.Play -> view.perform(effect.haptic)
+            LoginEffect.CommitAutofill -> autofill?.commit()
         }
     }
     LoginContent(state = state, onEvent = viewModel::onEvent, modifier = modifier)

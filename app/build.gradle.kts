@@ -36,15 +36,28 @@ android {
     }
 }
 
-/** Release reaches only kheprios.com: what lets local builds reach a dev machine must never merge into it. */
+/**
+ * Release reaches only kheprios.com over TLS: what lets local builds reach a dev machine must never merge into it.
+ * Checks the merged manifest, the network security configs in the release source sets, and the base URL.
+ */
 abstract class VerifyReleaseManifest : DefaultTask() {
     @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val manifest: RegularFileProperty
+
+    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) abstract val networkConfigs: ConfigurableFileCollection
+
+    @get:Input abstract val apiBaseUrl: Property<String>
 
     @TaskAction
     fun verify() {
         val text = manifest.get().asFile.readText()
         check("android.permission.ACCESS_LOCAL_NETWORK" !in text) { "release must not ask for ACCESS_LOCAL_NETWORK" }
         check("usesCleartextTraffic=\"true\"" !in text) { "release must not allow cleartext" }
+        networkConfigs.files.forEach { config ->
+            check("cleartextTrafficPermitted=\"true\"" !in config.readText()) {
+                "release must not allow cleartext: $config"
+            }
+        }
+        check(apiBaseUrl.get().startsWith("\"https://")) { "release API_BASE_URL must be https: ${apiBaseUrl.get()}" }
     }
 }
 
@@ -55,6 +68,14 @@ androidComponents {
         val verify =
             tasks.register<VerifyReleaseManifest>("verifyReleaseManifest") {
                 manifest.set(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.MERGED_MANIFEST))
+                networkConfigs.from(
+                    listOf("main", "release")
+                        .map { layout.projectDirectory.file("src/$it/res/xml/network_security_config.xml") }
+                        .filter { it.asFile.exists() }
+                )
+                apiBaseUrl.set(
+                    checkNotNull(variant.buildConfigFields).map { it.getValue("API_BASE_URL").value.toString() }
+                )
             }
         tasks.named("check") { dependsOn(verify) }
     }
