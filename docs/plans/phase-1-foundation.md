@@ -522,7 +522,7 @@ interface Navigator { fun open(destination: AppDestination); fun open(link: Stri
 
 - `sections` = goals, check-ins, progress-check, reports, memories, knowledge, nutrition, care, mind, decisions, friends, crews, inbox, daily, awards.
 
-- [ ] **Step 1:** Write `DeepLinkParserTest` as a table. First port every case from the iOS router tests (`K/khepriTests`: the router, shell and `MorePath` tests). The rows below were derived by reading `destination(for:)` in `K/khepri/App/AppRouter.swift`, not by running it; if an iOS test disagrees with a row, the iOS test wins and this table is corrected. (U = a valid UUID in upper case; u = the same lower-cased.)
+- [x] **Step 1:** Write `DeepLinkParserTest` as a table. First port every case from the iOS router tests (`K/khepriTests`: the router, shell and `MorePath` tests). The rows below were derived by reading `destination(for:)` in `K/khepri/App/AppRouter.swift`, not by running it; if an iOS test disagrees with a row, the iOS test wins and this table is corrected. (U = a valid UUID in upper case; u = the same lower-cased.)
 
 | Link | Expected |
 |---|---|
@@ -557,10 +557,24 @@ interface Navigator { fun open(destination: AppDestination); fun open(link: Stri
 | `khepri://care` | `Section("care")` |
 | `khepri://nonsense`, `https://example.com/app/today`, `mailto:x@y.z` | `null` |
 
-- [ ] **Step 2:** Run; expect failure. Implement as a pure function following `destination(for:)` line by line. Run; expect PASS.
-- [ ] **Step 3:** `NavigatorTest`: `open(Goal(id))` selects More and produces the stack [More root, Goals, Goal(id)]; `open(CheckInFlow)` keeps the tab and adds a sheet entry; opening the same `CrewChannel` twice delivers two commands; a destination opened while `SignedInState.signedIn` is false is held and delivered once it turns true; `Invite` and `CrewJoin` go through `PendingLinks.put` so they survive process death and sign-up.
-- [ ] **Step 4:** Implement `Navigator` on the back-stack model from S9 (per-tab stacks; re-select pops to root).
-- [ ] **Step 5:** `./gradlew :core:navigation:test`. Expected: PASS. Commit.
+- [x] **Step 2:** Run; expect failure. Implement as a pure function following `destination(for:)` line by line. Run; expect PASS.
+- [x] **Step 3:** `NavigatorTest`: `open(Goal(id))` selects More and produces the stack [More root, Goals, Goal(id)]; `open(CheckInFlow)` keeps the tab and adds a sheet entry; opening the same `CrewChannel` twice delivers two commands; a destination opened while `SignedInState.signedIn` is false is held and delivered once it turns true; `Invite` and `CrewJoin` go through `PendingLinks.put` so they survive process death and sign-up.
+- [x] **Step 4:** Implement `Navigator` on the back-stack model from S9 (per-tab stacks; re-select pops to root).
+- [x] **Step 5:** `./gradlew :core:navigation:test`. Expected: PASS. Commit.
+
+**Done (2026-11-26).** 121 tests in `:core:navigation`: 105 parser rows (every iOS `ShellTests` row, the plan rows, the traps), 13 planner, 5 queue, 9 state, 3 Robolectric `TabHost`. The design went to the advisor (Fable was blocked by the context-mode hook). Deviations:
+
+- **Stacks live in an activity-scoped Hilt ViewModel, `NavigationState`,** not in `rememberNavBackStack`. It holds a `SnapshotStateList<Route>` per tab, the selected tab and one `ViewModelStoreProvider` per tab, and saves JSON in `SavedStateHandle`; unreadable state starts from the roots. Being a ViewModel puts it above the phase switch by construction.
+- **One-shot payloads are `ScreenAsk`s, not route fields,** as the iOS router's flags (`startsWorkout`, `checkInMood`, `coachDraft`, `opensNextWorkout`, `crewChannelRequest`, invite and crew-join counters, plus re-select reload). Asks are consumed once and not saved, so a restored stack never replays one.
+- **`NavPlanner` is a pure function of (stacks, command)** and follows `AppRouter.open(_:)`, `MorePath.opening(section:)` and `CrewLinkLanding`: a link for the crew whose space is on top of More asks that space to switch channel; any other crew replaces the space, with a fresh `opening` id. Sheets are pushed on the current tab, never twice, and a sheet replaces a sheet on top. The membership check iOS does before opening a space belongs to the crews feature.
+- **Gating:** `QueuedNavigator` keeps a pending list. `NavigationState` takes it whole while signed in. Invite and crew-join codes are written to `PendingLinks` before their command is queued; a disk failure still queues it.
+- **Sign-out:** the `SignOutCleaner` resets on the main thread before the phase changes (stacks to roots, every store cleared, asks and queue dropped, `epoch` bumped so `TabHost` drops all composed state). The signed-in true-to-false edge resets again, for a screen recreated in between.
+- **Entries replaced on a tab that is not composed** get `clearKey` at once, and their saved state is removed from the tab's `SaveableStateHolder` when the tab shows again (`TabHostTest`). The composed tab is left to the Navigation 3 decorators, which clear after the exit animation. Every route registers through `screen<T>()`, which uses `Route.contentKey()` and gives `Sheet` routes the bottom-sheet metadata.
+- **Navigation 3 1.2.2 ships `runtime.deeplink` (URI pattern matchers) and `runtime.result` (`ResultEffect`).** Neither is used: patterns cannot express "a malformed id falls back to the section", and iOS is the source of truth. `ResultEffect` waits for the first screen that needs a result from another.
+- **Moved to Task 12:** the shell around `TabHost` (Scaffold, tab bar, `hidesTabBar`), the DataStore `PendingLinks`, link consumption with `setIntent`, and the Hilt ViewModel with an assisted route key and `SavedStateHandle` under the per-tab provider, including process death on the emulator.
+- **Build logic:** `compose-ui-tooling-preview` is no longer added by `khepri.compose`; `:app`, `:core:designsystem` and `:core:ui` declare it.
+- **Fixed on the way:** `error_state_server.png` had been re-recorded as an empty window in 6725eab. Dark `ErrorState` captures were intermittently blank under Robolectric when the composition started in Dark; the test now draws a Light frame first, as `ComponentScreenshotTest` does (6 of 6 recordings stable).
+
 
 ### Task 10: Strings pipeline
 

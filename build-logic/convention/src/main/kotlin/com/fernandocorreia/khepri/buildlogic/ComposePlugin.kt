@@ -14,7 +14,6 @@ class ComposePlugin : Plugin<Project> {
                 add("implementation", bom)
                 add("testImplementation", bom)
                 add("implementation", lib("compose-material3"))
-                add("implementation", lib("compose-ui-tooling-preview"))
                 add("debugImplementation", lib("compose-ui-tooling"))
                 add("debugRuntimeOnly", lib("compose-ui-test-manifest"))
                 add("testImplementation", lib("compose-ui-test-junit4"))

@@ -392,9 +392,9 @@ One generated `OperationIndex` (method, path template, operationId, isPublic, is
 Five tabs: Today, Coach, Training, Progress, More. One saved back stack per tab (Navigation 3). Re-selecting a tab pops to its root and reloads. System back pops the stack, then returns to Today, then exits. More carries a badge with the crew unread count. The tab bar is hidden inside a coach thread and in full-screen flows.
 
 How it is built (proven in `docs/spikes/S9-navigation3.md`):
-- Each tab has one `rememberNavBackStack`.
+- The stacks, the selected tab and the per-tab ViewModel stores live in `NavigationState`, an activity-scoped ViewModel above the phase switch, saved in `SavedStateHandle` (not `rememberNavBackStack`). Commands go through the pure `NavPlanner`; one-shot payloads (start the workout, preset mood, coach draft, crew channel switch, re-select reload) are `ScreenAsk`s consumed once, never route fields.
 - Each tab has one `NavDisplay`, under `key(tab)` and a `SaveableStateHolder`.
-- Each tab has one `ViewModelStoreProvider`, held in an activity-scoped ViewModel and passed to `rememberViewModelStoreNavEntryDecorator(provider)`. The default decorator clears every entry's ViewModels on a tab switch.
+- Each tab has one `ViewModelStoreProvider`, held in `NavigationState` and passed to `rememberViewModelStoreNavEntryDecorator(provider)`. The default decorator clears every entry's ViewModels on a tab switch.
 - Sheets use our own `BottomSheetSceneStrategy` (Navigation 3 ships only dialogs).
 
 ### 8.3 Destinations

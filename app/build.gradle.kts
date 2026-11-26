@@ -35,5 +35,6 @@ dependencies {
     implementation(libs.lifecycle.process)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.activity.compose)
+    implementation(libs.compose.ui.tooling.preview)
     testImplementation(libs.hilt.android.testing)
 }

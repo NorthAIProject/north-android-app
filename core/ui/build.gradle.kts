@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    implementation(libs.compose.ui.tooling.preview)
     api(project(":core:model"))
     implementation(project(":core:designsystem"))
 }
