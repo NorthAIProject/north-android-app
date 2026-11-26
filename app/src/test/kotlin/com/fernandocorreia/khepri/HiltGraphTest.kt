@@ -2,6 +2,8 @@ package com.fernandocorreia.khepri
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.fernandocorreia.khepri.core.common.SessionGateway
+import com.fernandocorreia.khepri.core.common.SignOutCleaner
+import com.fernandocorreia.khepri.core.database.snapshot.SnapshotCache
 import com.fernandocorreia.khepri.core.navigation.Navigator
 import com.fernandocorreia.khepri.core.navigation.PendingLinks
 import com.fernandocorreia.khepri.core.navigation.ui.EntryInstaller
@@ -16,6 +18,7 @@ import javax.inject.Inject
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -45,11 +48,22 @@ class HiltGraphTest {
 
     @Inject lateinit var signIn: SignInWithEmail
 
+    @Inject lateinit var snapshots: SnapshotCache
+
+    @Inject lateinit var cleaners: Set<@JvmSuppressWildcards SignOutCleaner>
+
     @Before fun inject() = hilt.inject()
 
     @Test
     fun `the graph resolves, with one session behind the gateway and two clients`() {
         assertSame(session, gateway)
         assertNotSame(client, streaming)
+    }
+
+    @Test
+    fun `sign-out empties the database and forgets the consent answer and Today's memory`() {
+        val kinds = cleaners.map { it::class.java.simpleName }
+        val expected = listOf("DatabaseCleaner", "AiConsentRepositoryImpl", "TodayRepositoryImpl")
+        assertTrue(kinds.toString(), kinds.containsAll(expected))
     }
 }

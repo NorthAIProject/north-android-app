@@ -1,0 +1,67 @@
+# The AI data sharing question: shown to an account that has not answered, not
+# dismissable with Back, and never shown again once answered. Needs a freshly
+# seeded account (the server has no way to unset an answer). Credentials come
+# from the command line; see ../README.md.
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+- tapOn:
+    id: "login-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "ai-consent-decline"
+    timeout: 20000
+- pressKey: Back
+- assertVisible:
+    id: "ai-consent-decline"
+- tapOn:
+    id: "ai-consent-decline"
+- extendedWaitUntil:
+    visible:
+      id: "tab-today"
+    timeout: 20000
+- assertNotVisible:
+    id: "ai-consent"
+# Signing in again keeps the answer.
+- openLink: khepri://more
+- extendedWaitUntil:
+    visible:
+      id: "sign-out"
+    timeout: 10000
+- tapOn:
+    id: "sign-out"
+- tapOn:
+    id: "sign-out-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+- tapOn:
+    id: "login-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-today"
+    timeout: 20000
+- assertNotVisible:
+    id: "ai-consent"

@@ -81,6 +81,7 @@
     <string name="agent">Agente</string>
     <string name="agents">Agentes</string>
     <string name="agents_act_on_your_behalf_with_the_same">Os agentes agem em teu nome com as mesmas ferramentas do treinador. Revoga um para lhe cortar o acesso de imediato.</string>
+    <string name="ai_consent_health_connect">Saúde e condição física: treinos, sono, peso, medidas, nutrição, medicação e os dados que partilhas do Health Connect</string>
     <string name="ai_data_sharing">Partilha de dados com a IA</string>
     <string name="ai_is_off">A IA está desligada</string>
     <string name="ai_provider">Fornecedor de IA</string>
@@ -1097,6 +1098,7 @@
     <string name="of_x_ml">de %1$d ml</string>
     <string name="off">Desativado</string>
     <string name="offline">Sem ligação</string>
+    <string name="offline_showing_x" formatted="false">Sem ligação, a mostrar %1$s</string>
     <string name="ok">OK</string>
     <string name="okay">Bem</string>
     <string name="omega_3">Ómega-3</string>
@@ -1396,6 +1398,7 @@
     <string name="show_me_around">Mostra-me a app</string>
     <string name="show_password">Mostrar palavra-passe</string>
     <string name="showing_the_most_recent_entries_pick_a">A mostrar as entradas mais recentes. Escolhe um período mais curto para ver o resto.</string>
+    <string name="showing_x" formatted="false">A mostrar %1$s</string>
     <string name="shown_once_if_you_lose_it_revoke_this">Mostrado só uma vez. Se o perderes, revoga esta ligação e cria outra.</string>
     <string name="shows_this_lifts_history_and_forecast">Mostra o histórico e a previsão deste exercício</string>
     <string name="shows_this_moment_in_the_clip">Mostra este momento do clip</string>

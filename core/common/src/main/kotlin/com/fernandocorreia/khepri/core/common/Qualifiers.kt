@@ -15,3 +15,9 @@ import javax.inject.Qualifier
  * Cancelling does not clear state held in memory: account-bound state also registers a `SignOutCleaner`.
  */
 @Qualifier @Retention(AnnotationRetention.BINARY) public annotation class AccountScope
+
+/**
+ * The JSON configuration the API uses (`ApiJson.default`), provided by `:app`. Modules that may not see `:core:api`,
+ * such as the snapshot cache, encode and decode server shapes with it.
+ */
+@Qualifier @Retention(AnnotationRetention.BINARY) public annotation class WireJson

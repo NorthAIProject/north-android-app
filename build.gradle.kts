@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.room3) apply false
     alias(libs.plugins.roborazzi) apply false
     alias(libs.plugins.openapi.generator) apply false
     alias(libs.plugins.spotless)
@@ -35,6 +36,8 @@ dependencyAnalysis {
             onIncorrectConfiguration { severity("ignore") }
             onUnusedDependencies { exclude("com.google.dagger:hilt-android") }
         }
+        // Test support with no UI of its own: khepri.compose adds material3 to every Compose module.
+        project(":core:screenshot") { onUnusedDependencies { exclude("androidx.compose.material3:material3") } }
     }
     structure {
         bundle("junit-jupiter") { includeGroup("org.junit.jupiter") }

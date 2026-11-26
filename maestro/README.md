@@ -37,3 +37,7 @@ They are not part of `./gradlew check`.
    ```
 
 Never commit credentials, and never point a flow at production.
+
+## AI consent: asked once, not dismissable
+
+`maestro/flows/ai-consent.yaml` signs in an account that has never answered, checks that Back leaves the question open, answers Don't allow, then signs out and in again and checks it is not asked twice. The server cannot unset an answer, so seed a new throwaway account (step 2 above) for every run. The smoke flow answers Allow when it is asked, so run this flow first on a fresh account, or seed a separate one.

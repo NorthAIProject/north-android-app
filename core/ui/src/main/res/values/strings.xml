@@ -81,6 +81,7 @@
     <string name="agent">Agent</string>
     <string name="agents">Agents</string>
     <string name="agents_act_on_your_behalf_with_the_same">Agents act on your behalf with the same tools the coach has. Revoke one to cut it off at once.</string>
+    <string name="ai_consent_health_connect">Health and fitness: workouts, sleep, weight, measurements, nutrition, medications and data you share from Health Connect</string>
     <string name="ai_data_sharing">AI Data Sharing</string>
     <string name="ai_is_off">AI is off</string>
     <string name="ai_provider">AI Provider</string>
@@ -1099,6 +1100,7 @@
     <string name="of_x_ml">of %1$d ml</string>
     <string name="off">Off</string>
     <string name="offline">Offline</string>
+    <string name="offline_showing_x" formatted="false">Offline, showing %1$s</string>
     <string name="ok">OK</string>
     <string name="okay">Okay</string>
     <string name="omega_3">Omega-3</string>
@@ -1399,6 +1401,7 @@
     <string name="show_me_around">Show Me Around</string>
     <string name="show_password">Show password</string>
     <string name="showing_the_most_recent_entries_pick_a">Showing the most recent entries. Pick a shorter window to see the rest.</string>
+    <string name="showing_x" formatted="false">Showing %1$s</string>
     <string name="shown_once_if_you_lose_it_revoke_this">Shown once. If you lose it, revoke this connection and create another.</string>
     <string name="shows_this_lifts_history_and_forecast">Shows this lift\'s history and forecast</string>
     <string name="shows_this_moment_in_the_clip">Shows this moment in the clip</string>

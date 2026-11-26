@@ -1,5 +1,6 @@
 package com.fernandocorreia.khepri
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -12,16 +13,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.fernandocorreia.khepri.core.session.AppPhase
 import com.fernandocorreia.khepri.core.ui.LocalReduceMotion
 import com.fernandocorreia.khepri.shell.FailedScreen
 import com.fernandocorreia.khepri.shell.LockedScreen
 import com.fernandocorreia.khepri.shell.OnboardingPlaceholder
+import com.fernandocorreia.khepri.shell.coveredByConsent
 
 private const val PHASE_FADE_MS = 250
 
-/** iOS `RootView`: one screen per phase, cross-faded as iOS animates the phase change. */
+/**
+ * iOS `RootView`: one screen per phase, cross-faded as iOS animates the phase change, under the AI consent question.
+ */
 @Composable
 internal fun RootContent(
     phase: AppPhase,
@@ -29,12 +35,39 @@ internal fun RootContent(
     onSignOut: () -> Unit,
     signedOut: @Composable () -> Unit,
     signedIn: @Composable () -> Unit,
+    asksConsent: Boolean,
+    consent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+) {
+    // Over the signed-in app and onboarding only: a sign-out underneath takes the question away with it.
+    val gated = asksConsent && phase.coveredByConsent()
+    Box(modifier) {
+        // While gated, TalkBack must not reach what the question covers.
+        Box(if (gated) Modifier.clearAndSetSemantics {} else Modifier) {
+            Phases(phase, onRetry, onSignOut, signedOut, signedIn)
+        }
+        if (gated) ConsentCover(consent)
+    }
+}
+
+/** Takes every touch, so nothing reaches the app underneath, and Back does nothing: iOS disables dismissal. */
+@Composable
+private fun ConsentCover(consent: @Composable () -> Unit) {
+    BackHandler {}
+    Box(Modifier.fillMaxSize().pointerInput(Unit) {}) { consent() }
+}
+
+@Composable
+private fun Phases(
+    phase: AppPhase,
+    onRetry: () -> Unit,
+    onSignOut: () -> Unit,
+    signedOut: @Composable () -> Unit,
+    signedIn: @Composable () -> Unit,
 ) {
     val reduceMotion = LocalReduceMotion.current
     AnimatedContent(
         targetState = phase,
-        modifier = modifier,
         transitionSpec = {
             val spec = if (reduceMotion) snap<Float>() else tween(PHASE_FADE_MS)
             fadeIn(spec) togetherWith fadeOut(spec)

@@ -34,6 +34,7 @@ class RetrofitStackTest {
                 NetworkModule.connectionPool(),
                 LanguageInterceptor { listOf("en") },
                 BearerInterceptor(tokens, base),
+                ConsentRefusalInterceptor(com.fernandocorreia.khepri.core.common.SharedFlowConsentSignal()),
                 LongCallInterceptor(),
                 RetryInterceptor {},
             )

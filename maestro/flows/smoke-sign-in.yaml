@@ -20,6 +20,18 @@ appId: ${APP_ID}
 - hideKeyboard
 - tapOn:
     id: "login-submit"
+# A new account is asked about AI data sharing once; the server keeps the answer.
+- extendedWaitUntil:
+    visible:
+      id: "ai-consent|tab-today"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "ai-consent-allow"
+    commands:
+      - tapOn:
+          id: "ai-consent-allow"
 - extendedWaitUntil:
     visible:
       id: "tab-today"

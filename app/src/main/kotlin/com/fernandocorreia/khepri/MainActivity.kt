@@ -13,12 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriTheme
 import com.fernandocorreia.khepri.core.navigation.NavigationState
 import com.fernandocorreia.khepri.core.navigation.Navigator
 import com.fernandocorreia.khepri.core.navigation.ui.EntryInstaller
 import com.fernandocorreia.khepri.core.ui.ProvideReduceMotion
+import com.fernandocorreia.khepri.feature.auth.ui.consent.AiConsentScreen
 import com.fernandocorreia.khepri.feature.auth.ui.navigation.SignedOutRoot
 import com.fernandocorreia.khepri.shell.AppViewModel
 import com.fernandocorreia.khepri.shell.MainTabs
@@ -74,11 +76,19 @@ internal fun AppRoot(
     navigation: NavigationState = hiltViewModel(),
 ) {
     val phase by app.phase.collectAsStateWithLifecycle()
+    val asksConsent by app.asksConsent.collectAsStateWithLifecycle()
+    // iOS re-reads the answer whenever the app becomes active; a known answer makes this a no-op.
+    LifecycleStartEffect(app) {
+        app.onForeground()
+        onStopOrDispose {}
+    }
     RootContent(
         phase = phase,
         onRetry = app::retry,
         onSignOut = app::signOut,
         signedOut = { ScopedViewModels(app.signedOutStore) { SignedOutRoot() } },
         signedIn = { MainTabs(navigation, installers) },
+        asksConsent = asksConsent,
+        consent = { ScopedViewModels(app.consentStore) { AiConsentScreen() } },
     )
 }

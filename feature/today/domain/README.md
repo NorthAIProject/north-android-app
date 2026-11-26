@@ -2,4 +2,4 @@
 
 Models, repository interfaces, use cases. Pure Kotlin.
 
-Empty until Phase 2. Spec: `docs/feature-specs/today.md`.
+`Today`, `Day` and their cards; `TodayRepository`; observe and refresh use cases, and `StartFast`/`StopFast`, which reload the day screens. Spec: `docs/feature-specs/today.md`.

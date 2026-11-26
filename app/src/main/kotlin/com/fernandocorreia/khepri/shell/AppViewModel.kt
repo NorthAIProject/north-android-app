@@ -2,10 +2,13 @@ package com.fernandocorreia.khepri.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import com.fernandocorreia.khepri.core.common.ApplicationScope
 import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.session.AppPhase
 import com.fernandocorreia.khepri.core.session.SessionManager
+import com.fernandocorreia.khepri.feature.auth.domain.usecase.LoadAiConsent
+import com.fernandocorreia.khepri.feature.auth.domain.usecase.ObserveAiConsent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -16,8 +19,18 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AppViewModel
 @Inject
-constructor(private val session: SessionManager, @ApplicationScope private val scope: CoroutineScope) : ViewModel() {
+constructor(
+    private val session: SessionManager,
+    loadConsent: LoadAiConsent,
+    observeConsent: ObserveAiConsent,
+    @ApplicationScope private val scope: CoroutineScope,
+) : ViewModel() {
     val phase: StateFlow<AppPhase> = session.phase
+
+    private val consentGate = ConsentGate(phase, observeConsent, loadConsent, viewModelScope)
+
+    /** Whether the AI consent question covers the app. */
+    val asksConsent: StateFlow<Boolean> = consentGate.asks
 
     /**
      * The signed-out screens' ViewModels. It outlives rotation and is cleared when those screens leave
@@ -25,6 +38,15 @@ constructor(private val session: SessionManager, @ApplicationScope private val s
      * model goes with it).
      */
     val signedOutStore: ViewModelStore = ViewModelStore()
+
+    /**
+     * The consent question's ViewModel, cleared when the question leaves, so a failed save never shows to the next
+     * account.
+     */
+    val consentStore: ViewModelStore = ViewModelStore()
+
+    /** The activity came to the foreground. */
+    fun onForeground() = consentGate.foreground()
 
     /** On the application scope: leaving the screen must not cancel a retry or a sign-out halfway. */
     fun retry() {
@@ -37,5 +59,6 @@ constructor(private val session: SessionManager, @ApplicationScope private val s
 
     override fun onCleared() {
         signedOutStore.clear()
+        consentStore.clear()
     }
 }

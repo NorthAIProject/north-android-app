@@ -26,6 +26,9 @@ style:
     ignoreAnnotated: ['Preview']
 
 khepri:
+  AccountStateNeedsCleaner:
+    active: true
+    excludes: ['**/test/**', '**/androidTest/**']
   NoHardcodedUiText:
     active: true
     excludes: ['**/test/**', '**/androidTest/**']
@@ -43,3 +46,4 @@ Compose:
       - LocalRadii
       - LocalTextStyles
       - LocalReduceMotion
+      - LocalScreenAsks

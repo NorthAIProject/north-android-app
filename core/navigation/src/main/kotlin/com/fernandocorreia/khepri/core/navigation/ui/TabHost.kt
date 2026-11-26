@@ -2,6 +2,7 @@ package com.fernandocorreia.khepri.core.navigation.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -18,6 +19,7 @@ import com.fernandocorreia.khepri.core.navigation.AppTab
 import com.fernandocorreia.khepri.core.navigation.NavCommand
 import com.fernandocorreia.khepri.core.navigation.NavigationState
 import com.fernandocorreia.khepri.core.navigation.Route
+import com.fernandocorreia.khepri.core.navigation.ScreenAsk
 import com.fernandocorreia.khepri.core.navigation.contentKey
 
 /**
@@ -37,9 +39,16 @@ public fun TabHost(
     val latestUnported by rememberUpdatedState(unported)
     val provider =
         remember(installers) {
+            val roots =
+                installers.fold(emptyMap<AppTab, @Composable () -> Unit>()) { all, installer ->
+                    val twice = all.keys intersect installer.roots.keys
+                    check(twice.isEmpty()) { "Two features draw the root of $twice" }
+                    all + installer.roots
+                }
             entryProvider<Route>(
                 fallback = { route -> NavEntry(route, contentKey = route.contentKey()) { latestUnported(route) } }
             ) {
+                screen<Route.TabRoot> { root -> roots[root.tab]?.invoke() ?: UnportedRoot(root, latestUnported) }
                 installers.forEach { with(it) { install() } }
             }
         }
@@ -56,19 +65,28 @@ public fun TabHost(
                     state.composing(tab)
                     onDispose { state.leaving(tab) }
                 }
-                NavDisplay(
-                    backStack = stack,
-                    modifier = modifier,
-                    onBack = { state.apply(NavCommand.Pop) },
-                    entryDecorators =
-                        listOf(
-                            rememberSaveableStateHolderNavEntryDecorator(entryStates),
-                            rememberViewModelStoreNavEntryDecorator(state.provider(tab)),
-                        ),
-                    sceneStrategies = listOf(BottomSheetSceneStrategy()),
-                    entryProvider = provider,
-                )
+                CompositionLocalProvider(LocalScreenAsks provides state) {
+                    NavDisplay(
+                        backStack = stack,
+                        modifier = modifier,
+                        onBack = { state.apply(NavCommand.Pop) },
+                        entryDecorators =
+                            listOf(
+                                rememberSaveableStateHolderNavEntryDecorator(entryStates),
+                                rememberViewModelStoreNavEntryDecorator(state.provider(tab)),
+                            ),
+                        sceneStrategies = listOf(BottomSheetSceneStrategy()),
+                        entryProvider = provider,
+                    )
+                }
             }
         }
     }
+}
+
+/** A tab no feature draws yet: shows [unported] and drops the tab's reload asks, which nothing else would take. */
+@Composable
+private fun UnportedRoot(root: Route.TabRoot, unported: @Composable (Route) -> Unit) {
+    ConsumeAsks(pick = { (it as? ScreenAsk.ReloadRoot)?.takeIf { ask -> ask.tab == root.tab } }, onAsk = {})
+    unported(root)
 }

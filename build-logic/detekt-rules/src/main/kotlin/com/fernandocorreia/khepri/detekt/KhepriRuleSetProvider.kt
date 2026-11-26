@@ -12,6 +12,7 @@ class KhepriRuleSetProvider : RuleSetProvider {
         RuleSet(
             ruleSetId,
             mapOf(
+                RuleName("AccountStateNeedsCleaner") to ::AccountStateNeedsCleaner,
                 RuleName("NoHardcodedUiText") to ::NoHardcodedUiText,
                 RuleName("NoNotNullAssertion") to ::NoNotNullAssertion,
             ),

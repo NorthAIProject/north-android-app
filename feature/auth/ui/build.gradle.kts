@@ -8,6 +8,7 @@ dependencies {
 
     testImplementation(project(":core:common"))
     testImplementation(project(":core:testing"))
+    testImplementation(project(":core:screenshot"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
 }

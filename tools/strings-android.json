@@ -1,4 +1,10 @@
 {
+  "ai_consent_health_connect": {
+    "en": "Health and fitness: workouts, sleep, weight, measurements, nutrition, medications and data you share from Health Connect",
+    "es": "Salud y forma física: entrenamientos, sueño, peso, medidas, nutrición, medicación y los datos que compartes desde Health Connect",
+    "pt-PT": "Saúde e condição física: treinos, sono, peso, medidas, nutrição, medicação e os dados que partilhas do Health Connect",
+    "pt-BR": "Saúde e condicionamento físico: treinos, sono, peso, medidas, nutrição, medicamentos e os dados que você compartilha do Health Connect"
+  },
   "brand_name": {
     "en": "Khepri"
   },
@@ -35,7 +41,19 @@
     "pt-PT": "Tentar outra vez",
     "pt-BR": "Tentar de novo"
   },
+  "offline_showing_x": {
+    "en": "Offline, showing %1$s",
+    "es": "Sin conexión, mostrando %1$s",
+    "pt-PT": "Sem ligação, a mostrar %1$s",
+    "pt-BR": "Sem conexão, mostrando %1$s"
+  },
   "placeholder_body": {
     "en": "This screen arrives in a later phase."
+  },
+  "showing_x": {
+    "en": "Showing %1$s",
+    "es": "Mostrando %1$s",
+    "pt-PT": "A mostrar %1$s",
+    "pt-BR": "Mostrando %1$s"
   }
 }

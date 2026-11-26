@@ -15,7 +15,7 @@ Add a row when you find an iOS behaviour that is missing here; the Swift code is
 | ☐ | Failed phase shows Try Again and Sign Out | 1 | U |
 | ☐ | Unreadable token shows a waiting screen and never signs out | 1 | U |
 | ☐ | Onboarding phase shows the wizard | 3 | M |
-| ☐ | AI consent gate covers everything until answered | 2 | M |
+| ☑ | AI consent gate covers everything until answered | 2 | M |
 | ☐ | Declined consent: Coach tab shows "AI is off", orb hidden | 3 | M |
 | ☐ | Five tabs, each keeps its own stack | 1 | M |
 | ☐ | Re-selecting a tab pops to root and reloads | 1 | M |

@@ -44,6 +44,9 @@ public interface PendingLinks {
  * Queues commands in arrival order. Invite and crew join codes are written to [PendingLinks] before their command is
  * queued, so a screen that redeems on the command finds the code. `NavigationState` takes the queue while signed in.
  */
+// Not account data: commands queued while signed out (a tapped link) are for whoever signs in next, and
+// NavigationState takes the queue only while someone is signed in.
+@Suppress("AccountStateNeedsCleaner")
 @Singleton
 public class QueuedNavigator
 @Inject

@@ -8,6 +8,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.withContext
 
 /** Holds the live [NavigationState], if an activity has one, so sign-out can reach it. */
+// A handle to the activity's state, not account data: NavigationSignOutCleaner resets that state at sign-out.
+@Suppress("AccountStateNeedsCleaner")
 @Singleton
 public class NavigationRegistry @Inject constructor() {
     @Volatile internal var live: NavigationState? = null
