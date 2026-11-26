@@ -738,8 +738,8 @@ Deferred from the Task 12 amendments (Fable item 7):
 ## Done when
 
 - [x] A debug build signs in against a locally seeded server, switches tabs, opens a `khepri://` link, signs out.
-- [ ] `./gradlew check` is green locally and in CI; `./gradlew syncContract --check` is green locally.
-- [ ] Every gate in Task 2 was shown to fail on a deliberate violation.
-- [ ] Contract tests decode every committed golden fixture.
-- [ ] `CLAUDE.md` "Commands" section lists the real commands.
-- [ ] Known Phase 1 limitation recorded in `CLAUDE.md`: offline cold launch shows `Failed` until the Phase 2 cache exists.
+- [x] `./gradlew check` is green locally and in CI; `./gradlew syncContract --check` is green locally.
+- [x] Every gate in Task 2 was shown to fail on a deliberate violation. (Task 12 added `verifyReleaseManifest`, also shown to fail.)
+- [x] Contract tests decode every committed golden fixture: 164 of 166. The other two, `tools` and `tools.readonly`, are MCP tool lists, not API responses (Task 4).
+- [x] `CLAUDE.md` "Commands" section lists the real commands.
+- [x] Known Phase 1 limitation recorded in `CLAUDE.md`: offline cold launch shows `Failed` until the Phase 2 cache exists.

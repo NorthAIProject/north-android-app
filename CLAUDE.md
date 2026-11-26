@@ -42,5 +42,15 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 
 ## Commands
 
-- `./gradlew check` runs everything CI runs, including `checkTranslations` and the `tools/` tests.
+- `./gradlew check` runs everything CI runs, including `checkTranslations`, the `tools/` tests, Roborazzi verification, `buildHealth` and `verifyReleaseManifest`.
+- `./gradlew syncContract [--check]` copies the spec, medals and golden fixtures at `core/api/contract.sha` from `../north-client`; `--check` fails if the committed copies differ.
+- `./gradlew :<module>:recordRoborazziDebug` re-records a module's screenshots after an intended visual change.
+- `./gradlew :app:assembleDebug`, `:app:assembleMinified` (release code under R8, debug-signed, local backend) and `:app:assembleRelease`.
+- `maestro/README.md`: the smoke flow against a local backend at the pinned SHA. Never with real credentials or production.
 - `python3 tools/convert_strings.py [--check]` regenerates `core/ui` strings from the iOS catalogs. Never edit the generated `strings.xml`; Android-only copy goes in `tools/strings-android.json`.
+- `python3 tools/sync_theme.py` copies colours from the iOS asset catalog; `python3 tools/emblem_to_vector.py` regenerates the emblem drawables from the web's SVGs.
+
+## Known limitations
+
+- Phase 1: a cold launch with no connection shows the `Failed` screen (Try Again, Sign Out) until the Phase 2 cache exists.
+- Local builds (`debug`, `minified`) need `ACCESS_LOCAL_NETWORK` granted on API 37+ to reach `10.0.2.2`; without it calls time out silently.
