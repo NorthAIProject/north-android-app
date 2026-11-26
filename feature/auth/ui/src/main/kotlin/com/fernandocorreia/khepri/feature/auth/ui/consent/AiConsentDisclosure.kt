@@ -1,5 +1,6 @@
 package com.fernandocorreia.khepri.feature.auth.ui.consent
 
+import android.content.ActivityNotFoundException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriTheme
@@ -46,7 +48,7 @@ fun AiConsentDisclosure(recipients: List<String>, modifier: Modifier = Modifier)
             )
         }
         Text(stringResource(R.string.your_data_is_used_to_answer_you_and_to))
-        TextButton(onClick = { uri.openUri(PRIVACY_URL) }) { Text(stringResource(R.string.read_the_privacy_policy)) }
+        TextButton(onClick = { uri.openPrivacyPolicy() }) { Text(stringResource(R.string.read_the_privacy_policy)) }
     }
 }
 
@@ -59,3 +61,11 @@ private fun Bullet(text: String) {
 }
 
 private const val PRIVACY_URL = "https://kheprios.com/privacy"
+
+private fun UriHandler.openPrivacyPolicy() {
+    try {
+        openUri(PRIVACY_URL)
+    } catch (expected: ActivityNotFoundException) {
+        // No browser on the phone: the tap does nothing, as the app's other links do.
+    }
+}

@@ -4,7 +4,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -14,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriTheme
 import com.fernandocorreia.khepri.core.navigation.NavigationState
@@ -77,6 +77,11 @@ internal fun AppRoot(
 ) {
     val phase by app.phase.collectAsStateWithLifecycle()
     val asksConsent by app.asksConsent.collectAsStateWithLifecycle()
+    // iOS re-reads the answer whenever the app becomes active; a known answer makes this a no-op.
+    LifecycleStartEffect(app) {
+        app.onForeground()
+        onStopOrDispose {}
+    }
     RootContent(
         phase = phase,
         onRetry = app::retry,
@@ -84,10 +89,6 @@ internal fun AppRoot(
         signedOut = { ScopedViewModels(app.signedOutStore) { SignedOutRoot() } },
         signedIn = { MainTabs(navigation, installers) },
         asksConsent = asksConsent,
-        consent = {
-            // Not dismissable, as on iOS: Back does nothing while the question is open.
-            BackHandler {}
-            AiConsentScreen()
-        },
+        consent = { ScopedViewModels(app.consentStore) { AiConsentScreen() } },
     )
 }

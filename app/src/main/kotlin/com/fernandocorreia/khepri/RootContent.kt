@@ -1,5 +1,6 @@
 package com.fernandocorreia.khepri
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -12,7 +13,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.fernandocorreia.khepri.core.session.AppPhase
 import com.fernandocorreia.khepri.core.ui.LocalReduceMotion
 import com.fernandocorreia.khepri.shell.FailedScreen
@@ -36,11 +39,22 @@ internal fun RootContent(
     consent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Over the signed-in app and onboarding only: a sign-out underneath takes the question away with it.
+    val gated = asksConsent && phase.coveredByConsent()
     Box(modifier) {
-        Phases(phase, onRetry, onSignOut, signedOut, signedIn)
-        // Over the signed-in app and onboarding only: a sign-out underneath takes the question away with it.
-        if (asksConsent && phase.coveredByConsent()) consent()
+        // While gated, TalkBack must not reach what the question covers.
+        Box(if (gated) Modifier.clearAndSetSemantics {} else Modifier) {
+            Phases(phase, onRetry, onSignOut, signedOut, signedIn)
+        }
+        if (gated) ConsentCover(consent)
     }
+}
+
+/** Takes every touch, so nothing reaches the app underneath, and Back does nothing: iOS disables dismissal. */
+@Composable
+private fun ConsentCover(consent: @Composable () -> Unit) {
+    BackHandler {}
+    Box(Modifier.fillMaxSize().pointerInput(Unit) {}) { consent() }
 }
 
 @Composable

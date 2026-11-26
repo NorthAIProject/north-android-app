@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -51,10 +52,21 @@ class AiConsentRepositoryImplTest {
     private fun TestScope.repository() =
         AiConsentRepositoryImpl(retrofit.create(AiConsentApi::class.java), signal, backgroundScope)
 
-    private fun answer(code: Int, body: String) =
+    private fun answer(code: Int, body: String, delayMs: Long = 0) =
         server.enqueue(
-            MockResponse.Builder().code(code).addHeader("Content-Type", "application/json").body(body).build()
+            MockResponse.Builder()
+                .code(code)
+                .addHeader("Content-Type", "application/json")
+                .body(body)
+                .headersDelay(delayMs, TimeUnit.MILLISECONDS)
+                .build()
         )
+
+    private val refusal = """{"error":{"message":"Allow AI first","code":"ai_consent_required"}}"""
+
+    /** Waits, in real time, until the server has seen [count] requests (the re-read runs on the background scope). */
+    private suspend fun awaitRequests(count: Int) =
+        withContext(Dispatchers.Default) { withTimeout(5_000) { while (server.requestCount < count) delay(10) } }
 
     private fun consent(status: String) =
         answer(200, """{"status":"$status","version":1,"recipients":["Anthropic","Google"]}""")
@@ -120,16 +132,61 @@ class AiConsentRepositoryImplTest {
         repository.load()
         val today = retrofit.create(TodayApi::class.java)
 
-        answer(403, """{"error":{"message":"Allow AI first","code":"ai_consent_required"}}""")
+        answer(403, refusal)
         consent("declined")
         today.getToday()
-        repository.awaitChoice(ConsentChoice.Declined)
-        assertEquals(3, server.requestCount)
+        awaitRequests(3)
+        repository.load()
+        assertEquals(ConsentChoice.Declined, repository.consent.value.choice)
 
-        answer(403, """{"error":{"message":"Allow AI first","code":"ai_consent_required"}}""")
+        answer(403, refusal)
         consent("unset")
         today.getToday()
         assertTrue(repository.awaitChoice(ConsentChoice.Unanswered).needsAnswer)
+    }
+
+    @Test
+    fun `a declined account stays declined while a refusal re-reads it`() = runTest {
+        consent("declined")
+        val repository = repository()
+        repository.load()
+        val seen = mutableListOf<ConsentChoice>()
+        backgroundScope.launch(Dispatchers.Default) { repository.consent.collect { seen += it.choice } }
+        answer(403, refusal)
+        answer(200, """{"status":"declined","version":1,"recipients":[]}""", delayMs = 200)
+        retrofit.create(TodayApi::class.java).getToday()
+        awaitRequests(3)
+        repository.load()
+        assertEquals(listOf(ConsentChoice.Declined), seen.distinct())
+    }
+
+    @Test
+    fun `a failed re-read keeps the open question`() = runTest {
+        consent("unset")
+        val repository = repository()
+        repository.load()
+        answer(403, refusal)
+        answer(500, """{"error":{"message":"down"}}""")
+        retrofit.create(TodayApi::class.java).getToday()
+        awaitRequests(3)
+        repository.load()
+        assertEquals(ConsentChoice.Unanswered, repository.consent.value.choice)
+    }
+
+    @Test
+    fun `a save made while a re-read is in flight is not overwritten by it`() = runTest {
+        consent("unset")
+        val repository = repository()
+        repository.load()
+        answer(403, refusal)
+        answer(200, """{"status":"unset","version":1,"recipients":[]}""", delayMs = 300)
+        consent("granted")
+        retrofit.create(TodayApi::class.java).getToday()
+        awaitRequests(3)
+        assertEquals(Outcome.Ok(Unit), repository.decide(allow = true))
+        assertEquals(ConsentChoice.Allowed, repository.consent.value.choice)
+        val methods = List(4) { requireNotNull(server.takeRequest(1, TimeUnit.SECONDS)).method }
+        assertEquals(listOf("GET", "GET", "GET", "PUT"), methods)
     }
 
     @Test

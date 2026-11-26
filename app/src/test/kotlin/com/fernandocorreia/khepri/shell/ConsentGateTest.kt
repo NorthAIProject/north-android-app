@@ -78,4 +78,15 @@ class ConsentGateTest {
         assertEquals(2, repository.loads)
         assertTrue(gate.asks.value)
     }
+
+    @Test
+    fun `coming to the foreground reads again, but only over the app or onboarding`() = runTest {
+        val gate = gate()
+        phase.value = AppPhase.SignedOut
+        gate.foreground()
+        assertEquals(0, repository.loads)
+        phase.value = AppPhase.SignedIn
+        gate.foreground()
+        assertEquals(2, repository.loads)
+    }
 }

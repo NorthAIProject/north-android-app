@@ -111,7 +111,9 @@ interface AiConsentRepository {
 
 ---
 
-Done 2026-11-26. Deviation from Step 8: `ai-consent.yaml` signs in a freshly seeded account rather than signing up in the flow, since a new sign-up lands on the Onboarding placeholder until Phase 4; `maestro/README.md` says to seed one per run. The gate swallows Back in `AppRoot` (`:app` has activity-compose), not in the screen.
+Done 2026-11-26. Deviation from Step 8: `ai-consent.yaml` signs in a freshly seeded account rather than signing up in the flow, since a new sign-up lands on the Onboarding placeholder until Phase 4; `maestro/README.md` says to seed one per run. The gate swallows Back in `RootContent` (`:app` has activity-compose), not in the screen.
+
+Fable review of Task 1 (fixed): a consent refusal re-reads the answer without passing through Unknown (`reset() then load()` in the Interfaces above is superseded: a declined account never flickers, and a failed re-read keeps the open question); requests run one at a time so a re-read cannot overwrite a save; the cover takes every touch and hides the app from TalkBack; the answer is re-read on every activity start (iOS reads on `scenePhase == .active`); the screen's ViewModel lives in its own store, cleared when the question leaves; the privacy link survives a phone with no browser.
 
 ### Task 2: `:core:database` and the snapshot cache
 

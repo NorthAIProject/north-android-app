@@ -24,9 +24,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * iOS `AIConsentCenter`, minus the screen state. A consent refusal from any call reloads the answer from the server, so
- * the question comes back only if the account really has not answered. Sign-out forgets the answer; an answer that
- * arrives after a sign-out (or after a newer reset) is dropped, so the next account never sees this one's.
+ * iOS `AIConsentCenter`, minus the screen state. A consent refusal from any call re-reads the answer from the server
+ * and keeps showing the current one until the server replies, so the question comes back only if the account really has
+ * not answered, and a declined account never flickers. Requests run one at a time, so a re-read that started before a
+ * save cannot overwrite it. Sign-out forgets the answer; a reply that arrives after a sign-out is dropped, so the next
+ * account never sees this one's.
  */
 @Singleton
 internal class AiConsentRepositoryImpl
@@ -36,41 +38,47 @@ constructor(private val api: AiConsentApi, signal: ConsentSignal, @ApplicationSc
     private val state = MutableStateFlow(AiConsent.Unknown)
     override val consent: StateFlow<AiConsent> = state.asStateFlow()
 
-    private val loading = Mutex()
+    private val requests = Mutex()
 
-    /** Bumped by [reset]; a response is applied only if no reset happened while it was in flight. */
-    @Volatile private var generation = 0
+    /** Guards [generation] and the writes to [state], which come from several threads. Never held across a call. */
+    private val lock = Any()
+
+    /** Bumped at sign-out; a reply is applied only to the account it was asked for. */
+    private var generation = 0
 
     init {
-        scope.launch {
-            signal.required.collect {
-                reset()
-                load()
-            }
+        scope.launch { signal.required.collect { refresh() } }
+    }
+
+    override suspend fun load(): Outcome<Unit> = requests.withLock {
+        if (state.value.choice != ConsentChoice.Unknown) Outcome.Ok(Unit) else fetch()
+    }
+
+    override suspend fun decide(allow: Boolean): Outcome<Unit> = requests.withLock {
+        applying {
+            apiCall(map = { it.toAiConsent() }) { api.setAIConsent(SetAIConsentRequestDto(decisionFor(allow))) }
         }
     }
 
-    override suspend fun load(): Outcome<Unit> = loading.withLock {
-        if (state.value.choice != ConsentChoice.Unknown) return@withLock Outcome.Ok(Unit)
-        applying { apiCall(map = { it.toAiConsent() }) { api.getAIConsent() } }
-    }
-
-    override suspend fun decide(allow: Boolean): Outcome<Unit> = applying {
-        apiCall(map = { it.toAiConsent() }) { api.setAIConsent(SetAIConsentRequestDto(decisionFor(allow))) }
-    }
-
     override fun reset() {
-        generation++
-        state.value = AiConsent.Unknown
+        synchronized(lock) {
+            generation++
+            state.value = AiConsent.Unknown
+        }
     }
 
     override suspend fun afterLogout(reason: SignOutReason) = reset()
 
+    /** Re-reads the answer even when it is known; a failure keeps what is there. */
+    private suspend fun refresh(): Outcome<Unit> = requests.withLock { fetch() }
+
+    private suspend fun fetch(): Outcome<Unit> = applying { apiCall(map = { it.toAiConsent() }) { api.getAIConsent() } }
+
     private suspend fun applying(call: suspend () -> Outcome<AiConsent>): Outcome<Unit> {
-        val started = generation
+        val started = synchronized(lock) { generation }
         return when (val result = call()) {
             is Outcome.Ok -> {
-                if (generation == started) state.value = result.value
+                synchronized(lock) { if (generation == started) state.value = result.value }
                 Outcome.Ok(Unit)
             }
             is Outcome.Err -> result

@@ -27,8 +27,10 @@ constructor(
 ) : ViewModel() {
     val phase: StateFlow<AppPhase> = session.phase
 
+    private val consentGate = ConsentGate(phase, observeConsent, loadConsent, viewModelScope)
+
     /** Whether the AI consent question covers the app. */
-    val asksConsent: StateFlow<Boolean> = ConsentGate(phase, observeConsent, loadConsent, viewModelScope).asks
+    val asksConsent: StateFlow<Boolean> = consentGate.asks
 
     /**
      * The signed-out screens' ViewModels. It outlives rotation and is cleared when those screens leave
@@ -36,6 +38,15 @@ constructor(
      * model goes with it).
      */
     val signedOutStore: ViewModelStore = ViewModelStore()
+
+    /**
+     * The consent question's ViewModel, cleared when the question leaves, so a failed save never shows to the next
+     * account.
+     */
+    val consentStore: ViewModelStore = ViewModelStore()
+
+    /** The activity came to the foreground. */
+    fun onForeground() = consentGate.foreground()
 
     /** On the application scope: leaving the screen must not cancel a retry or a sign-out halfway. */
     fun retry() {
@@ -48,5 +59,6 @@ constructor(
 
     override fun onCleared() {
         signedOutStore.clear()
+        consentStore.clear()
     }
 }
