@@ -703,7 +703,7 @@ Open: the banner's live region is not yet checked with TalkBack on a device.
 - [x] **Step 9:** Run `maestro test maestro/flows/smoke-sign-in.yaml`. Expected: PASS.
 - [x] **Step 10:** Run `./gradlew check :app:assembleRelease`. Expected: BUILD SUCCESSFUL. Push; CI green. Commit.
 
-**Done (2026-11-26).** 1,018 tests green in `check`. The smoke flow passes against the backend at `6823e58c` on the `minified` build (release code under R8) and on `debug` (StrictMode with `penaltyDeath`, no violations). On the emulator, three taps on a placeholder's `SavedStateHandle` counter survive `adb shell am kill`, along with the selected tab and the session. Deviations and findings:
+**Done (2026-11-26).** 1,018 tests green in `check`. The smoke flow passes against the backend at `6823e58c` on the `minified` build (release code under R8; not true at first, see the review below) and on `debug` (StrictMode with `penaltyDeath`, no violations). On the emulator, three taps on a placeholder's `SavedStateHandle` counter survive `adb shell am kill`, along with the selected tab and the session. Deviations and findings:
 
 - **The app had no `INTERNET` permission.** No earlier task made a call on a device, so nothing failed. `:core:network` now declares it, and `ManifestTest` checks the merged manifest.
 - **API 37 blocks private addresses** unless the app holds `ACCESS_LOCAL_NETWORK` (a runtime permission). Without it, `10.0.2.2` times out after 15 s with no log. Only the `debug` and `minified` manifests declare it, since release talks only to `kheprios.com`. The flow grants it with `permissions: all: allow`.
@@ -715,6 +715,23 @@ Open: the banner's live region is not yet checked with TalkBack on a device.
 - **Pending links** (invite and crew codes received while signed out) persist in a Preferences DataStore (`PendingLinksStore`).
 - **Local backend:** in development it refuses to boot without `POSTHOG_API_KEY`. The run used a dummy key with `POSTHOG_HOST` on a closed local port, so no events left the machine. The seeded account's model steps answer 503 without AI keys; the flow does not need them. See `maestro/README.md`.
 - **Emulator:** only one build may be installed, or `khepri://` stops at the "Open with" chooser.
+
+**Fable review of Task 12 (2026-11-26).** Fixed:
+
+- **High: `minified` had no R8.** It copied `release` before `release` enabled minification, so the first smoke run was not under R8 (3 dex files, 32.7 MB, no mapping). `minified` now follows `release`, and configuration fails if either type stops minifying. On the real R8 build (1 dex, 4.2 MB, mapping written) the smoke flow, the process-death check (tab and `SavedStateHandle` counter restored after `am kill`) and back (another tab, then Today, then out of the app) all pass.
+- The signed-out store was cleared on the phase change, which cancelled the login ViewModel before its success branch, so the autofill commit never ran. It is now cleared when the signed-out screens leave composition (not on rotation). The password-save prompt itself is not checked on the emulator (no password manager signed in).
+- A `SavedStateHandle` under `ScopedViewModels` is now held by the scoped owner, so it goes with the store instead of passing to the next account's ViewModel. It is not saved across process death.
+- Pending codes: one per kind, the newest, as iOS keeps one pending invite, so links fired at the app cannot grow the file. Like iOS, they are not cleared on sign-out.
+- Only `kheprios.com` links go on to a browser: the activity is exported, and another app could otherwise use it to open any site.
+- `verifyReleaseManifest` (in `check`) fails if release asks for `ACCESS_LOCAL_NETWORK` or allows cleartext. Shown to fail on a violation.
+- Link use is a tested function (`LinkIntent.consume`): Robolectric `ActivityScenario` never goes idle while the launch spinner animates, so the activity itself is not launched in tests.
+
+Not changed: `LockedScreen` has no retry button, as on iOS. `SessionLifecycle` retries on every `ON_START`.
+
+Deferred from the Task 12 amendments (Fable item 7):
+- **Sheet swipe-dismiss, and a sheet restored after process death:** to the first navigation sheet route (Phase 2). The reset sheet is not a route and is not restored by design.
+- **A minSdk 28 emulator run:** to the end-of-phase pass; it needs an API 28 system image.
+- **What a push link does during a workout:** to the phase that ports the workout. Recommendation unchanged: hold it until the workout ends.
 
 ---
 

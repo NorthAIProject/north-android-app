@@ -10,14 +10,17 @@ import java.io.IOException
 
 /**
  * Invite and crew-join codes from links, kept on disk until a screen redeems them, so a code opened while signed out
- * survives sign-up and a process kill. Each code is kept once, oldest first. Other destinations are not kept.
+ * survives sign-up and a process kill. One code of each kind, the newest, as iOS keeps one pending invite: links fired
+ * at the app cannot grow the file. Not cleared on sign-out (nor on iOS): the next account to sign in redeems it. Other
+ * destinations are not kept.
  */
 class PendingLinksStore(private val dataStore: DataStore<Preferences>) : PendingLinks {
     override suspend fun put(destination: AppDestination) {
         val line = destination.line() ?: return
         dataStore.edit { prefs ->
-            val lines = prefs[key].lines()
-            if (line !in lines) prefs[key] = (lines + line).joinToString("\n")
+            val kind = line.substringBefore(':')
+            val others = prefs[key].lines().filterNot { it.substringBefore(':') == kind }
+            prefs[key] = (others + line).joinToString("\n")
         }
     }
 

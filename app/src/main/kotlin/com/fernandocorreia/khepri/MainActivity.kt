@@ -53,15 +53,12 @@ class MainActivity : ComponentActivity() {
         consume(intent)
     }
 
-    /** Hands a link to the navigator; one it does not know opens in the browser. Either way it is used once. */
+    /** Hands a link to the navigator; an own web link it does not know opens in the browser. Either way, once. */
     private fun consume(intent: Intent) {
-        val link = LinkIntent.link(intent) ?: return
-        if (!navigator.open(link)) openInBrowser(intent)
-        setIntent(LinkIntent.consumed(intent))
+        setIntent(LinkIntent.consume(intent, navigator::open, ::openInBrowser))
     }
 
-    private fun openInBrowser(intent: Intent) {
-        val browser = LinkIntent.browser(intent) ?: return
+    private fun openInBrowser(browser: Intent) {
         try {
             startActivity(browser)
         } catch (expected: ActivityNotFoundException) {

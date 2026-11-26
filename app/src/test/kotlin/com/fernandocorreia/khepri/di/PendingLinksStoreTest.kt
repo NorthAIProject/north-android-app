@@ -19,12 +19,13 @@ class PendingLinksStoreTest {
         )
 
     @Test
-    fun `codes come back once, oldest first, without duplicates`() = runTest {
+    fun `one code of each kind comes back once, the newest`() = runTest {
         val store = store()
         store.put(AppDestination.Invite("abc123xyz9"))
         store.put(AppDestination.CrewJoin("crew42"))
-        store.put(AppDestination.Invite("abc123xyz9"))
-        assertEquals(listOf(AppDestination.Invite("abc123xyz9"), AppDestination.CrewJoin("crew42")), store.take())
+        store.put(AppDestination.Invite("zzz999aaa1"))
+        repeat(50) { store.put(AppDestination.Invite("flood$it")) }
+        assertEquals(listOf(AppDestination.CrewJoin("crew42"), AppDestination.Invite("flood49")), store.take())
         assertEquals(emptyList<AppDestination>(), store.take())
     }
 

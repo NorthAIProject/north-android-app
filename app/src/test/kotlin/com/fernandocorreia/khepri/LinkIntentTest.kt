@@ -25,11 +25,40 @@ class LinkIntentTest {
     }
 
     @Test
-    fun `an unknown web link goes to a browser, never back to the app, and a custom scheme goes nowhere`() {
+    fun `only an own web link goes to a browser, never back to the app`() {
         val browser = LinkIntent.browser(view("https://kheprios.com/app/unknown"))
         assertEquals("https", browser?.selector?.data?.scheme)
         assertNull(browser?.selector?.data?.host)
         assertEquals("https://kheprios.com/app/unknown", browser?.dataString)
         assertNull(LinkIntent.browser(view("khepri://nowhere")))
+        assertNull(LinkIntent.browser(view("https://evil.example/app")))
+    }
+
+    @Test
+    fun `a link is used once, by the navigator or a browser, and dropped either way`() {
+        val opened = mutableListOf<String>()
+        val started = mutableListOf<Intent>()
+        fun consume(link: String, known: Boolean) =
+            LinkIntent.consume(
+                view(link),
+                {
+                    opened += it
+                    known
+                },
+                { started += it },
+            )
+
+        assertNull(consume("khepri://more", known = true).data)
+        assertEquals(listOf("khepri://more"), opened)
+        assertEquals(emptyList<Intent>(), started)
+
+        assertNull(consume("https://kheprios.com/i/short", known = false).data)
+        assertEquals("https://kheprios.com/i/short", started.single().dataString)
+
+        consume("https://evil.example/i/short", known = false)
+        assertEquals(1, started.size)
+
+        val launch = Intent(Intent.ACTION_MAIN)
+        assertEquals(launch, LinkIntent.consume(launch, { error("no link") }, { error("no link") }))
     }
 }

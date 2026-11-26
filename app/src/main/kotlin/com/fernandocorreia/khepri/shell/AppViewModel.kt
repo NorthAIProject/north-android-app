@@ -2,7 +2,6 @@ package com.fernandocorreia.khepri.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.viewModelScope
 import com.fernandocorreia.khepri.core.common.ApplicationScope
 import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.session.AppPhase
@@ -21,20 +20,11 @@ constructor(private val session: SessionManager, @ApplicationScope private val s
     val phase: StateFlow<AppPhase> = session.phase
 
     /**
-     * The signed-out screens' ViewModels. It outlives rotation, and is cleared whenever the app leaves `SignedOut`, so
-     * nothing typed on the login screen is there after the next sign-out (on iOS the screen's model goes with it).
+     * The signed-out screens' ViewModels. It outlives rotation and is cleared when those screens leave
+     * (`ScopedViewModels`), so nothing typed on the login screen is there after the next sign-out (on iOS the screen's
+     * model goes with it).
      */
     val signedOutStore: ViewModelStore = ViewModelStore()
-
-    init {
-        viewModelScope.launch {
-            var previous: AppPhase? = null
-            session.phase.collect { phase ->
-                if (previous == AppPhase.SignedOut && phase != AppPhase.SignedOut) signedOutStore.clear()
-                previous = phase
-            }
-        }
-    }
 
     /** On the application scope: leaving the screen must not cancel a retry or a sign-out halfway. */
     fun retry() {

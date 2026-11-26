@@ -18,8 +18,14 @@ android {
             applicationIdSuffix = ".debug"
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8090\"")
         }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "API_BASE_URL", "\"https://kheprios.com\"")
+        }
         // Release code (R8, resource shrinking) against the local backend, signed with the debug key: for the smoke
-        // flow and R8 checks. Never uploaded.
+        // flow and R8 checks. Never uploaded. It copies `release`, so it must come after it.
         create("minified") {
             initWith(getByName("release"))
             applicationIdSuffix = ".minified"
@@ -27,13 +33,32 @@ android {
             matchingFallbacks += "release"
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8090\"")
         }
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            buildConfigField("String", "API_BASE_URL", "\"https://kheprios.com\"")
-        }
     }
+}
+
+/** Release reaches only kheprios.com: what lets local builds reach a dev machine must never merge into it. */
+abstract class VerifyReleaseManifest : DefaultTask() {
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val manifest: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val text = manifest.get().asFile.readText()
+        check("android.permission.ACCESS_LOCAL_NETWORK" !in text) { "release must not ask for ACCESS_LOCAL_NETWORK" }
+        check("usesCleartextTraffic=\"true\"" !in text) { "release must not allow cleartext" }
+    }
+}
+
+androidComponents {
+    // A build type that copies `release` before `release` is configured gets no R8 and still builds. Fail instead.
+    onVariants(selector().withBuildType("release")) { variant ->
+        check(variant.isMinifyEnabled) { "release must run R8" }
+        val verify =
+            tasks.register<VerifyReleaseManifest>("verifyReleaseManifest") {
+                manifest.set(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.MERGED_MANIFEST))
+            }
+        tasks.named("check") { dependsOn(verify) }
+    }
+    onVariants(selector().withBuildType("minified")) { check(it.isMinifyEnabled) { "minified must run R8" } }
 }
 
 dependencies {
