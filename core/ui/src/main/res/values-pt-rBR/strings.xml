@@ -1098,6 +1098,7 @@
     <string name="of_x_ml">de %1$d ml</string>
     <string name="off">Desativado</string>
     <string name="offline">Sem conexão</string>
+    <string name="offline_showing_x" formatted="false">Sem conexão, mostrando %1$s</string>
     <string name="ok">OK</string>
     <string name="okay">Bem</string>
     <string name="omega_3">Ômega-3</string>

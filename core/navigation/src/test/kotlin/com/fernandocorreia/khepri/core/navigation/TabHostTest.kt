@@ -2,22 +2,26 @@ package com.fernandocorreia.khepri.core.navigation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.fernandocorreia.khepri.core.navigation.ui.ConsumeAsks
 import com.fernandocorreia.khepri.core.navigation.ui.EntryInstaller
 import com.fernandocorreia.khepri.core.navigation.ui.TabHost
 import com.fernandocorreia.khepri.core.navigation.ui.screen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,7 +34,6 @@ class TabHostTest {
     private val installer =
         object : EntryInstaller {
             override fun EntryProviderScope<Route>.install() {
-                screen<Route.TabRoot> { Text("root ${it.tab}") }
                 screen<Route.Section> { Text("section ${it.id}") }
                 screen<Route.Decision> { Text("decision ${it.id}") }
                 screen<Route.Goal> { goal ->
@@ -38,6 +41,9 @@ class TabHostTest {
                     Text("goal ${goal.id} taps $taps", Modifier.clickable { taps++ })
                 }
             }
+
+            override val roots: Map<AppTab, @Composable () -> Unit> =
+                AppTab.entries.filter { it != AppTab.More }.associateWith { tab -> { Root(tab) } }
         }
 
     private fun state(): NavigationState {
@@ -81,5 +87,32 @@ class TabHostTest {
         compose.onNodeWithText("root Today").assertExists()
         compose.runOnIdle { state.apply(NavCommand.Open(AppDestination.Goal("g1"))) }
         compose.onNodeWithText("goal g1 taps 0").assertExists()
+    }
+
+    private val reloads = mutableListOf<AppTab>()
+
+    @Composable
+    private fun Root(tab: AppTab) {
+        ConsumeAsks(pick = { (it as? ScreenAsk.ReloadRoot)?.takeIf { ask -> ask.tab == tab } }) { reloads += it.tab }
+        Text("root $tab")
+    }
+
+    @Test
+    fun `a re-selected tab's root takes its reload once, and a tab with no root drops it`() {
+        val state = state()
+        compose.setContent { TabHost(state, setOf(installer), unported = { Text("unported") }) }
+        compose.runOnIdle { state.select(AppTab.Today) }
+        compose.runOnIdle { state.select(AppTab.Today) }
+        compose.runOnIdle {
+            assertEquals(listOf(AppTab.Today, AppTab.Today), reloads)
+            assertEquals(emptyList<ScreenRequest>(), state.requests.value)
+        }
+        compose.runOnIdle { state.select(AppTab.More) }
+        compose.onNodeWithText("unported").assertIsDisplayed()
+        compose.runOnIdle { state.select(AppTab.More) }
+        compose.runOnIdle {
+            assertEquals(emptyList<ScreenRequest>(), state.requests.value)
+            assertEquals(listOf(AppTab.Today, AppTab.Today), reloads)
+        }
     }
 }

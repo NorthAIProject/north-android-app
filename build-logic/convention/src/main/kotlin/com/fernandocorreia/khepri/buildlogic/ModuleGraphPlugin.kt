@@ -86,6 +86,7 @@ abstract class AssertModuleGraphTask : DefaultTask() {
                     ":core:(datastore|database|navigation) -> :core:(model|common)",
                     ":core:session -> :core:(model|common|api|network|datastore)",
                     ":core:designsystem -> :core:model",
+                    ":core:screenshot -> :core:designsystem",
                     ":core:ui -> :core:(model|common|designsystem)",
                     ":core:(charts|scene3d) -> :core:(designsystem|ui)",
                     ":core:(speech|health|notifications) -> :core:(model|common|api|network|datastore)",

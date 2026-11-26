@@ -20,7 +20,9 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 - Coroutine scopes: a screen's work on `viewModelScope`; work that outlives a screen but belongs to the account on `@AccountScope` (cancelled at sign-out and at the next sign-in); only sign-out and retry on `@ApplicationScope`.
 - Account-bound state held in a singleton (a cache, an in-memory `StateFlow`) registers a `SignOutCleaner` that clears it. Cancelling `@AccountScope` stops work; it does not clear memory.
 - A screen collects its `Effect` channel with `CollectEffects` and reloads on `bus.reloads(scope, ...)`, never on raw `DataChangeBus.changes`.
-- `UiState` lives in a private `MutableStateFlow`. A screen that loads exposes it with `onStart { load() }.stateIn(viewModelScope, WhileSubscribed(5_000), initial)`; a form with no load (sign-in) exposes it as is.
+- `UiState` lives in a private `MutableStateFlow` (or is combined from the repository's flows). A screen that loads exposes it with `onStart { launchRefresh() }.stateIn(viewModelScope, WhileSubscribed(5_000), initial)`, where `launchRefresh` launches and returns at once (never await in `onStart`: stored content must reach the screen before the network answers); a form with no load (sign-in) exposes it as is.
+- A tab root is drawn by its feature's `EntryInstaller.roots`, never by registering `Route.TabRoot`. A screen takes its `ScreenAsk`s (`ReloadRoot`, payloads) with `ConsumeAsks`.
+- Screenshot tests draw through `ScreenshotHarness` (`:core:screenshot`, test-only): one `show` per test, then change settings or state and `capture`.
 
 ## Traps
 

@@ -41,6 +41,12 @@
     "pt-PT": "Tentar outra vez",
     "pt-BR": "Tentar de novo"
   },
+  "offline_showing_x": {
+    "en": "Offline, showing %1$s",
+    "es": "Sin conexión, mostrando %1$s",
+    "pt-PT": "Sem ligação, a mostrar %1$s",
+    "pt-BR": "Sem conexão, mostrando %1$s"
+  },
   "placeholder_body": {
     "en": "This screen arrives in a later phase."
   }

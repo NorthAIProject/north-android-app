@@ -29,11 +29,11 @@ include(
     ":core:session",
 )
 
-include(":core:designsystem", ":core:ui", ":core:testing", ":core:navigation")
+include(":core:designsystem", ":core:ui", ":core:testing", ":core:screenshot", ":core:navigation")
 
 include(":feature:auth:domain", ":feature:auth:data", ":feature:auth:ui")
 
-include(":feature:today:domain", ":feature:today:data")
+include(":feature:today:domain", ":feature:today:data", ":feature:today:ui")
 
 include(":detekt-rules")
 

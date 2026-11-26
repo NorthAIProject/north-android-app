@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.ViewModelStoreProvider
 import com.fernandocorreia.khepri.core.common.SignedInState
+import com.fernandocorreia.khepri.core.navigation.ui.ScreenAsks
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
@@ -40,7 +41,7 @@ internal constructor(
     signedInState: SignedInState,
     private val registry: NavigationRegistry,
     private val newOpening: () -> String,
-) : ViewModel() {
+) : ViewModel(), ScreenAsks {
     @Inject
     public constructor(
         handle: SavedStateHandle,
@@ -77,7 +78,7 @@ internal constructor(
         private set
 
     /** Asks waiting for their screen. */
-    public val requests: StateFlow<List<ScreenRequest>> = asks.asStateFlow()
+    override val requests: StateFlow<List<ScreenRequest>> = asks.asStateFlow()
 
     init {
         registry.live = this
@@ -108,7 +109,7 @@ internal constructor(
 
     public fun provider(tab: AppTab): ViewModelStoreProvider = memory.provider(tab)
 
-    public fun consume(request: ScreenRequest) {
+    override fun consume(request: ScreenRequest) {
         asks.update { it - request }
     }
 

@@ -1100,6 +1100,7 @@
     <string name="of_x_ml">of %1$d ml</string>
     <string name="off">Off</string>
     <string name="offline">Offline</string>
+    <string name="offline_showing_x" formatted="false">Offline, showing %1$s</string>
     <string name="ok">OK</string>
     <string name="okay">Okay</string>
     <string name="omega_3">Omega-3</string>
