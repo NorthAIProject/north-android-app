@@ -13,7 +13,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -47,10 +46,9 @@ fun TodayScreen(modifier: Modifier = Modifier, viewModel: TodayViewModel = hiltV
     ConsumeAsks(pick = { (it as? ScreenAsk.ReloadRoot)?.takeIf { ask -> ask.tab == AppTab.Today } }) {
         viewModel.onEvent(TodayEvent.Reload)
     }
-    // The first start is the appear, which the state's own start refreshes for.
-    val starts = remember { intArrayOf(0) }
+    // Every start: back in the foreground, or back on the tab. A refresh already running is joined, not repeated.
     LifecycleStartEffect(viewModel) {
-        if (starts[0]++ > 0) viewModel.onEvent(TodayEvent.Reload)
+        viewModel.onEvent(TodayEvent.Reload)
         onStopOrDispose {}
     }
     TodayContent(state, viewModel::onEvent, modifier)

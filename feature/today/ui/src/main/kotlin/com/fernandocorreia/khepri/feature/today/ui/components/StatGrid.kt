@@ -1,5 +1,6 @@
 package com.fernandocorreia.khepri.feature.today.ui.components
 
+import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -42,8 +45,7 @@ import com.fernandocorreia.khepri.feature.today.domain.model.Today
 import com.fernandocorreia.khepri.feature.today.ui.R as TodayR
 import java.text.NumberFormat
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import java.util.Locale
 
 /** iOS `StatGrid`: streak, check-in, water and sleep, two by two; one column from font scale [ONE_COLUMN_SCALE]. */
 @Composable
@@ -77,7 +79,7 @@ private fun StreakTile(streak: Int, modifier: Modifier = Modifier) {
         title = stringResource(R.string.streak),
         icon = TodayR.drawable.ic_streak,
         tint = KhepriTheme.colors.ember,
-        value = NumberFormat.getIntegerInstance().format(streak),
+        value = NumberFormat.getIntegerInstance(locale()).format(streak),
         unit = stringResource(if (streak == 1) R.string.day else R.string.days),
         modifier = modifier.testTag("stat-streak"),
     )
@@ -89,8 +91,8 @@ private fun CheckInTile(today: Today, onCheckIn: () -> Unit, modifier: Modifier 
     val tag = modifier.testTag("stat-check-in")
     when {
         checkIn != null -> {
-            val time =
-                DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(checkIn.at.atZone(ZoneId.systemDefault()))
+            val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
+            val time = clockTime(locale(), use24Hour).format(checkIn.at.atZone(ZoneId.systemDefault()))
             val label = stringResource(R.string.check_in_at_x_mood_x_energy_x, time, checkIn.mood, checkIn.energy)
             StatTile(
                 title = stringResource(R.string.check_in_3),
@@ -125,9 +127,9 @@ private fun CheckInTile(today: Today, onCheckIn: () -> Unit, modifier: Modifier 
 
 @Composable
 private fun WaterTile(hydration: Hydration, modifier: Modifier = Modifier) {
-    val litres = NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }
+    val litres = NumberFormat.getNumberInstance(locale()).apply { maximumFractionDigits = 1 }
     val drunk =
-        NumberFormat.getNumberInstance().apply {
+        NumberFormat.getNumberInstance(locale()).apply {
             minimumFractionDigits = 1
             maximumFractionDigits = 1
         }
@@ -145,7 +147,7 @@ private fun WaterTile(hydration: Hydration, modifier: Modifier = Modifier) {
 @Composable
 private fun SleepTile(sleep: SleepSummary, modifier: Modifier = Modifier) {
     val hours =
-        NumberFormat.getNumberInstance().apply {
+        NumberFormat.getNumberInstance(locale()).apply {
             minimumFractionDigits = 1
             maximumFractionDigits = 1
         }
@@ -232,6 +234,9 @@ private fun StatTile(
         }
     }
 }
+
+/** The app's language, so numbers and times follow it (pt-PT reads "1,2"), as the copy around them does. */
+@Composable private fun locale(): Locale = LocalConfiguration.current.locales[0]
 
 private const val ONE_COLUMN_SCALE = 1.5f
 private const val ML_PER_LITRE = 1000.0

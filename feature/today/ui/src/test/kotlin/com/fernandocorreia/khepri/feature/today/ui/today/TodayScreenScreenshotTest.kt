@@ -64,7 +64,7 @@ class TodayScreenScreenshotTest {
         shots.capture("today_empty")
         screen = TodayUiState(Loadable.Failed(AppError.Network(interrupted = false)), date = TODAY)
         shots.capture("today_failed")
-        screen = content.copy(stale = Staleness(NOW.minus(Duration.ofHours(11)), showDay = true))
+        screen = content.copy(stale = Staleness(NOW.minus(Duration.ofHours(11)), offline = true))
         shots.capture("today_stale_yesterday")
         screen = content.copy(date = TODAY.minusDays(1), isToday = false)
         shots.capture("today_previous_day")

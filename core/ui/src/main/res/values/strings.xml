@@ -1401,6 +1401,7 @@
     <string name="show_me_around">Show Me Around</string>
     <string name="show_password">Show password</string>
     <string name="showing_the_most_recent_entries_pick_a">Showing the most recent entries. Pick a shorter window to see the rest.</string>
+    <string name="showing_x" formatted="false">Showing %1$s</string>
     <string name="shown_once_if_you_lose_it_revoke_this">Shown once. If you lose it, revoke this connection and create another.</string>
     <string name="shows_this_lifts_history_and_forecast">Shows this lift\'s history and forecast</string>
     <string name="shows_this_moment_in_the_clip">Shows this moment in the clip</string>

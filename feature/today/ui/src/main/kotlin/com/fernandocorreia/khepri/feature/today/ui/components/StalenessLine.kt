@@ -20,14 +20,16 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-/** "Offline, showing 23:10" under the header while Today shows what was stored after a failed refresh. */
+/**
+ * "Offline, showing 23:10" after a failed refresh; "Showing Wed 23:10" while yesterday's Today waits for its refresh.
+ */
 @Composable
 fun StalenessLine(stale: Staleness, today: LocalDate, modifier: Modifier = Modifier) {
     val locale = LocalConfiguration.current.locales[0]
     val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
     val time = stalenessTime(stale.fetchedAt, today, ZoneId.systemDefault(), locale, use24Hour)
     Text(
-        stringResource(R.string.offline_showing_x, time),
+        stringResource(if (stale.offline) R.string.offline_showing_x else R.string.showing_x, time),
         modifier = modifier.fillMaxWidth().testTag("staleness-line"),
         style = MaterialTheme.typography.bodySmall,
         color = KhepriTheme.colors.mutedForeground,
@@ -46,7 +48,7 @@ internal fun stalenessTime(
     use24Hour: Boolean,
 ): String {
     val at = fetchedAt.atZone(zone)
-    val time = DateTimeFormatter.ofPattern(if (use24Hour) "HH:mm" else "h:mm a", locale).format(at)
+    val time = clockTime(locale, use24Hour).format(at)
     val daysAgo = ChronoUnit.DAYS.between(at.toLocalDate(), today)
     val day =
         when {
@@ -58,3 +60,7 @@ internal fun stalenessTime(
 }
 
 private const val WEEK = 7
+
+/** Hours and minutes as the device shows them: 24 h or 12 h, in [locale]. */
+internal fun clockTime(locale: Locale, use24Hour: Boolean): DateTimeFormatter =
+    DateTimeFormatter.ofPattern(if (use24Hour) "HH:mm" else "h:mm a", locale)

@@ -81,28 +81,31 @@ constructor(
         }
 
     val state: StateFlow<TodayUiState> =
-        combine(inputs, revealed, ::render)
+        // tick: a midnight crossed with the same date shown still turns isToday and the header over.
+        combine(inputs, revealed, tick) { inputs, revealed, _ -> render(inputs, revealed) }
             .onEach { if (it.today !is Loadable.Loading) revealed.value = true }
             .onStart {
-                launchRefresh()
+                launchRefresh(rerun = false)
                 startPatience()
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), TodayUiState(date = today()))
 
     init {
-        viewModelScope.launch { bus.reloads(*DataScope.entries.toTypedArray()).collect { launchRefresh() } }
+        viewModelScope.launch {
+            bus.reloads(*DataScope.entries.toTypedArray()).collect { launchRefresh(rerun = true) }
+        }
     }
 
     fun onEvent(event: TodayEvent) {
         when (event) {
             TodayEvent.Refresh -> {
                 pulling.value = true
-                launchRefresh()
+                launchRefresh(rerun = false)
             }
-            TodayEvent.Reload -> launchRefresh()
-            TodayEvent.PreviousDay -> pick(shown().minusDays(1))
-            TodayEvent.NextDay -> if (shown() < today()) pick(shown().plusDays(1))
-            TodayEvent.GoToToday -> pick(today())
+            TodayEvent.Reload -> launchRefresh(rerun = false)
+            TodayEvent.PreviousDay -> step { pick(shown().minusDays(1)) }
+            TodayEvent.NextDay -> step { if (shown() < today()) pick(shown().plusDays(1)) }
+            TodayEvent.GoToToday -> step { pick(today()) }
             TodayEvent.OpenNextStep -> openNextStep()
             TodayEvent.OpenCheckIn -> navigator.open(AppDestination.CheckInFlow)
         }
@@ -111,6 +114,12 @@ constructor(
     private fun today(): LocalDate = LocalDate.now(clock)
 
     private fun shown(): LocalDate = selection.value ?: today()
+
+    /** Re-reads "today" first, so a screen that crossed midnight steps from the date it now shows. */
+    private inline fun step(move: () -> Unit) {
+        tick.update { it + 1 }
+        move()
+    }
 
     private fun pick(date: LocalDate) {
         val next = date.takeIf { it != today() }
@@ -125,10 +134,14 @@ constructor(
         if (step.kind == CHECK_IN) navigator.open(AppDestination.CheckInFlow) else navigator.open(step.href)
     }
 
-    /** Starts a refresh and returns at once, so stored content reaches the screen before the network answers. */
-    private fun launchRefresh() {
+    /**
+     * Starts a refresh and returns at once, so stored content reaches the screen before the network answers. While one
+     * runs, a write ([rerun]) asks for one more round after it, since the running round may have read the old value; an
+     * appear, a pull or a foreground return joins the running round.
+     */
+    private fun launchRefresh(rerun: Boolean) {
         if (refreshing?.isActive == true) {
-            again = true
+            if (rerun) again = true
             return
         }
         refreshing = viewModelScope.launch {
@@ -168,9 +181,11 @@ constructor(
         val ready = revealed || today is Loadable.Failed || (today !is Loadable.Loading && day !is Loadable.Loading)
         val now = today()
         val stale =
-            inputs.today
-                ?.takeIf { (it.refreshError ?: inputs.todayError)?.let { e -> e !is AppError.SignedOut } == true }
-                ?.let { Staleness(it.fetchedAt, showDay = it.fetchedAt.atZone(clock.zone).toLocalDate() != now) }
+            inputs.today?.let { cached ->
+                val failed = (cached.refreshError ?: inputs.todayError)?.let { it !is AppError.SignedOut } == true
+                val earlier = cached.fetchedAt.atZone(clock.zone).toLocalDate() != now
+                Staleness(cached.fetchedAt, offline = failed).takeIf { failed || earlier }
+            }
         return TodayUiState(
             today = if (ready) today else Loadable.Loading,
             day = if (ready) day else Loadable.Loading,
@@ -180,13 +195,6 @@ constructor(
             stale = stale.takeIf { ready },
         )
     }
-
-    private fun <T> loadable(cached: Cached<T>?, error: AppError?, refreshing: Boolean = false): Loadable<T> =
-        when {
-            cached != null -> Loadable.Content(cached.value, refreshing = refreshing)
-            error != null -> Loadable.Failed(error)
-            else -> Loadable.Loading
-        }
 
     private data class Inputs(
         val today: Cached<Today>?,
@@ -203,3 +211,10 @@ constructor(
         const val CHECK_IN = "check_in"
     }
 }
+
+private fun <T> loadable(cached: Cached<T>?, error: AppError?, refreshing: Boolean = false): Loadable<T> =
+    when {
+        cached != null -> Loadable.Content(cached.value, refreshing = refreshing)
+        error != null -> Loadable.Failed(error)
+        else -> Loadable.Loading
+    }

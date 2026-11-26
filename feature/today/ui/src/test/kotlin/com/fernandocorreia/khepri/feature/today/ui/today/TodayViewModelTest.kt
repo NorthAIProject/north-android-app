@@ -24,6 +24,7 @@ import com.fernandocorreia.khepri.feature.today.ui.today
 import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -64,9 +65,10 @@ class TodayViewModelTest {
 
     private fun settle() = main.dispatcher.scheduler.runCurrent()
 
-    private fun watch() {
-        watching.launch(main.dispatcher) { model.state.collect {} }
+    private fun watch(): Job {
+        val job = watching.launch(main.dispatcher) { model.state.collect {} }
         settle()
+        return job
     }
 
     private fun stored(value: com.fernandocorreia.khepri.feature.today.domain.model.Today, ago: Duration = HOUR) {
@@ -105,7 +107,67 @@ class TodayViewModelTest {
         repository.todayResult = Outcome.Err(AppError.Network(interrupted = false))
         watch()
         assertEquals(Loadable.Content(today), state.today)
-        assertEquals(Staleness(NOW.minus(Duration.ofHours(11)), showDay = true), state.stale)
+        assertEquals(Staleness(NOW.minus(Duration.ofHours(11)), offline = true), state.stale)
+    }
+
+    @Test
+    fun `yesterday's Today is marked while its refresh runs, so it never reads as today's`() {
+        stored(today, ago = Duration.ofHours(11))
+        repository.day(TODAY).value = Cached(day(), NOW)
+        repository.gate = CompletableDeferred()
+        watch()
+        assertEquals(Staleness(NOW.minus(Duration.ofHours(11)), offline = false), state.stale)
+    }
+
+    @Test
+    fun `an error the repository kept marks the stored Today offline`() {
+        val offline = AppError.Network(interrupted = false)
+        repository.today.value = Cached(today, NOW.minus(HOUR), refreshError = offline)
+        repository.day(TODAY).value = Cached(day(), NOW)
+        repository.gate = CompletableDeferred()
+        watch()
+        assertEquals(Staleness(NOW.minus(HOUR), offline = true), state.stale)
+    }
+
+    @Test
+    fun `back in the foreground after the screen stopped watching refreshes once`() {
+        stored(today)
+        val first = watch()
+        assertEquals(1, repository.todayRefreshes)
+        first.cancel()
+        main.dispatcher.scheduler.advanceTimeBy(6_000)
+        settle()
+        // The state's restart and the screen's start land together, before the network answers.
+        repository.gate = CompletableDeferred()
+        watch()
+        model.onEvent(TodayEvent.Reload)
+        repository.gate?.complete(Unit)
+        settle()
+        assertEquals(2, repository.todayRefreshes)
+    }
+
+    @Test
+    fun `an appear, a pull or a reload during a refresh join it`() {
+        stored(today)
+        repository.gate = CompletableDeferred()
+        watch()
+        model.onEvent(TodayEvent.Reload)
+        model.onEvent(TodayEvent.Refresh)
+        settle()
+        repository.gate?.complete(Unit)
+        settle()
+        assertEquals(1, repository.todayRefreshes)
+    }
+
+    @Test
+    fun `stepping back after midnight steps from the new today`() {
+        stored(today)
+        watch()
+        clock.now = NOW.plus(Duration.ofDays(1))
+        model.onEvent(TodayEvent.PreviousDay)
+        settle()
+        assertEquals(TODAY, state.date)
+        assertEquals(false, state.isToday)
     }
 
     @Test
@@ -179,12 +241,12 @@ class TodayViewModelTest {
     }
 
     @Test
-    fun `reasons to refresh during a refresh run it once more afterwards`() {
+    fun `writes during a refresh run it once more afterwards`() {
         stored(today)
         repository.gate = CompletableDeferred()
         watch()
         bus.changed(DataScope.Day)
-        model.onEvent(TodayEvent.Reload)
+        bus.changed(DataScope.Training)
         settle()
         assertEquals(1, repository.todayRefreshes)
         repository.gate?.complete(Unit)

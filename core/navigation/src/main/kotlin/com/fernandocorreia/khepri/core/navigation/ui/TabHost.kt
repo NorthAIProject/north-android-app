@@ -40,7 +40,11 @@ public fun TabHost(
     val provider =
         remember(installers) {
             val roots =
-                installers.fold(emptyMap<AppTab, @Composable () -> Unit>()) { all, installer -> all + installer.roots }
+                installers.fold(emptyMap<AppTab, @Composable () -> Unit>()) { all, installer ->
+                    val twice = all.keys intersect installer.roots.keys
+                    check(twice.isEmpty()) { "Two features draw the root of $twice" }
+                    all + installer.roots
+                }
             entryProvider<Route>(
                 fallback = { route -> NavEntry(route, contentKey = route.contentKey()) { latestUnported(route) } }
             ) {

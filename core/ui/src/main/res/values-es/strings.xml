@@ -1398,6 +1398,7 @@
     <string name="show_me_around">Hazme un recorrido</string>
     <string name="show_password">Mostrar contraseña</string>
     <string name="showing_the_most_recent_entries_pick_a">Se muestran las entradas más recientes. Elige un periodo más corto para ver el resto.</string>
+    <string name="showing_x" formatted="false">Mostrando %1$s</string>
     <string name="shown_once_if_you_lose_it_revoke_this">Se muestra una sola vez. Si lo pierdes, revoca esta conexión y crea otra.</string>
     <string name="shows_this_lifts_history_and_forecast">Muestra el historial y la previsión de este ejercicio</string>
     <string name="shows_this_moment_in_the_clip">Muestra este momento del clip</string>

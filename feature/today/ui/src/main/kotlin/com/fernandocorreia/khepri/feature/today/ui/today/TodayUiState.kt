@@ -7,9 +7,9 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * The Today tab: Today's snapshot, the day My Day shows ([date], today unless stepped back), and [stale] while a
- * refresh failed and Today shows what was stored. [stale] is the screen's one staleness signal; `Content.staleSince`
- * stays unset here.
+ * The Today tab: Today's snapshot, the day My Day shows ([date], today unless stepped back), and [stale] while Today
+ * shows what was stored after a failed refresh, or from an earlier day. [stale] is the screen's one staleness signal;
+ * `Content.staleSince` stays unset here.
  */
 data class TodayUiState(
     val today: Loadable<Today> = Loadable.Loading,
@@ -21,5 +21,8 @@ data class TodayUiState(
     val stale: Staleness? = null,
 )
 
-/** Today was fetched at [fetchedAt]; [showDay] when that was on an earlier day, so the line names the weekday. */
-data class Staleness(val fetchedAt: Instant, val showDay: Boolean)
+/**
+ * Today on screen was fetched at [fetchedAt]: shown after a failed refresh ([offline]), and also while a refresh runs
+ * when it is from an earlier day, so yesterday's numbers never read as today's.
+ */
+data class Staleness(val fetchedAt: Instant, val offline: Boolean)

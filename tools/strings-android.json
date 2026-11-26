@@ -49,5 +49,11 @@
   },
   "placeholder_body": {
     "en": "This screen arrives in a later phase."
+  },
+  "showing_x": {
+    "en": "Showing %1$s",
+    "es": "Mostrando %1$s",
+    "pt-PT": "A mostrar %1$s",
+    "pt-BR": "Mostrando %1$s"
   }
 }
