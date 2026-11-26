@@ -158,6 +158,7 @@
     <string name="awards_did_not_load">Awards did not load</string>
     <string name="back">Back</string>
     <string name="back_2">Back</string>
+    <string name="back_to_mood">Back to mood</string>
     <string name="back_to_today">Back to Today</string>
     <string name="back_to_your_usual_week">Back to Your Usual Week</string>
     <string name="barbell">Barbell</string>
@@ -262,6 +263,7 @@
     <string name="check_in_streaks">Check-in streaks</string>
     <string name="check_in_streaks_reaching_7_30_100_or">Check-in streaks reaching 7, 30, 100 or 365 days</string>
     <string name="check_in_with_mood_mood_and_energy">Check in with mood ${mood} and energy ${energy}</string>
+    <string name="check_in_with_two_taps_mood_then_energy">Check in with two taps: mood, then energy.</string>
     <string name="check_in_x_day_streak">Check in, %1$d-day streak</string>
     <string name="check_ins">Check-ins</string>
     <string name="check_ins_did_not_load">Check-ins did not load</string>
@@ -473,7 +475,6 @@
     <string name="elsewhere">Elsewhere</string>
     <string name="email">Email</string>
     <string name="email_address">Email address</string>
-    <string name="empty"></string>
     <string name="empty_2">–</string>
     <string name="empty_3">—</string>
     <string name="empty_4">\@</string>
@@ -677,6 +678,7 @@
     <string name="how_to">How to</string>
     <string name="how_you_eat">How You Eat</string>
     <string name="how_youll_know_its_done">How you\'ll know it\'s done</string>
+    <string name="hows_today">How\'s today?</string>
     <string name="hpfrei_body_anatomy_3d_viewer">hpfrei/body-anatomy-3d-viewer</string>
     <string name="hrv">HRV</string>
     <string name="hrv_resting_heart_rate_and_last_nights">HRV, resting heart rate and last night\'s sleep, each against your last four weeks.</string>

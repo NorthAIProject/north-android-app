@@ -158,6 +158,7 @@
     <string name="awards_did_not_load">Los premios no se cargaron</string>
     <string name="back">Atrás</string>
     <string name="back_2">Espalda</string>
+    <string name="back_to_mood">Volver al ánimo</string>
     <string name="back_to_today">Volver a hoy</string>
     <string name="back_to_your_usual_week">Volver a tu semana habitual</string>
     <string name="barbell">Barra</string>
@@ -262,6 +263,7 @@
     <string name="check_in_streaks">Rachas de registros diarios</string>
     <string name="check_in_streaks_reaching_7_30_100_or">Rachas de registros diarios que llegan a 7, 30, 100 o 365 días</string>
     <string name="check_in_with_mood_mood_and_energy">Registrar el día con ánimo ${mood} y energía ${energy}</string>
+    <string name="check_in_with_two_taps_mood_then_energy">Regístrate con dos toques: ánimo y luego energía.</string>
     <string name="check_in_x_day_streak">Haz tu registro, racha de %1$d días</string>
     <string name="check_ins">Registros diarios</string>
     <string name="check_ins_did_not_load">No se pudieron cargar los registros diarios</string>
@@ -473,7 +475,6 @@
     <string name="elsewhere">En otro sitio</string>
     <string name="email">Correo electrónico</string>
     <string name="email_address">Correo electrónico</string>
-    <string name="empty"></string>
     <string name="empty_2">–</string>
     <string name="empty_3">—</string>
     <string name="empty_4">\@</string>
@@ -677,6 +678,7 @@
     <string name="how_to">Cómo hacerlo</string>
     <string name="how_you_eat">Cómo comes</string>
     <string name="how_youll_know_its_done">Cómo sabrás que está hecho</string>
+    <string name="hows_today">¿Qué tal hoy?</string>
     <string name="hpfrei_body_anatomy_3d_viewer">hpfrei/body-anatomy-3d-viewer</string>
     <string name="hrv">VFC</string>
     <string name="hrv_resting_heart_rate_and_last_nights">VFC, frecuencia cardíaca en reposo y el sueño de anoche, cada uno comparado con tus últimas cuatro semanas.</string>

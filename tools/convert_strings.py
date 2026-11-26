@@ -9,7 +9,8 @@ and writes core/ui/src/main/res/values{,-es,-pt-rPT,-pt-rBR}/strings.xml.
 
 - Resource names come from tools/strings-keys.json (iOS key -> name), so a name
   never changes when its English text does. A new key gets a snake-case name
-  made from its English text, and the map is rewritten.
+  made from its English text. Entries are never removed, so a key that drops out
+  for a run (untranslated, stale) gets its old name back, and no name is reused.
 - %@ becomes %N$s and %lld/%d become %N$d. A string with no arguments is literal
   (formatted="false"), as SwiftUI shows it.
 - A key iOS has not translated into every locale is left out and listed: iOS
@@ -19,6 +20,8 @@ and writes core/ui/src/main/res/values{,-es,-pt-rPT,-pt-rBR}/strings.xml.
 - With --check it writes nothing and exits 1 when the committed files differ
   from what it would generate.
 """
+
+from __future__ import annotations
 
 import json
 import re
@@ -124,6 +127,15 @@ def complete(item: dict) -> bool:
     return item.get("shouldTranslate") is False or all(loc in item.get("localizations", {}) for loc in TRANSLATED)
 
 
+def rank(item: dict) -> tuple[bool, bool]:
+    """Which copy of a key shared between catalogs to use: a live one first, then a translated one."""
+    return item.get("extractionState") != "stale", complete(item)
+
+
+# In a string without arguments a % is literal, and must read as one: followed by a space, punctuation or the end.
+LITERAL_PERCENT = re.compile(r"%(?=[\s.,;:!?)\]}'\"]|$)")
+
+
 def make_name(text: str, taken: set[str]) -> str:
     ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     ascii_text = SPEC.sub(" x ", ascii_text).replace("'", "").replace("\u2019", "")
@@ -146,33 +158,56 @@ def make_name(text: str, taken: set[str]) -> str:
     return unique
 
 
+def literal_text(text: str) -> str:
+    if LITERAL_PERCENT.sub("", text).count("%"):
+        raise FormatError(f"unsupported % in {text!r}")
+    return text
+
+
 def resource(value, literal: bool) -> tuple[Resource, set]:
     if isinstance(value, dict):
+        if "other" not in value:
+            raise FormatError("plural without other")
         quantities, found = {}, set()
         for quantity, text in value.items():
-            converted, args = (text, set()) if literal else android_format(text)
+            converted, args = (literal_text(text), set()) if literal else android_format(text)
             quantities[quantity] = converted
             found |= args
         return Resource(quantities=quantities, formatted=not literal), found
+    if not value:
+        raise FormatError("empty value")
     if literal:
-        return Resource(text=value, formatted="%" not in value), set()
+        args = {(0, m.group(0)) for m in SPEC.finditer(value) if m.group(0) != "%%"}
+        return Resource(text=literal_text(value), formatted="%" not in value), args
     text, args = android_format(value)
     return Resource(text=text), args
 
 
 def build(catalogs: list[dict], keymap: dict[str, str], android: dict[str, dict[str, str]]) -> Result:
     result = Result(locales={loc: {} for loc in FOLDERS}, keymap={})
+    clash = sorted(set(android) & set(keymap.values()))
+    if clash:
+        raise ValueError(f"tools/strings-android.json reuses names the key map gives iOS keys: {clash}")
     taken = set(android) | set(keymap.values())
     for name, texts in android.items():
+        if set(texts) == {"en"}:
+            result.locales["en"][name] = Resource(text=texts["en"], formatted="%" not in texts["en"], translatable=False)
+            continue
+        missing = [loc for loc in FOLDERS if not texts.get(loc)]
+        tokens = {loc: sorted(re.findall(r"%\d+\$[sdf]", texts.get(loc, ""))) for loc in FOLDERS}
+        if missing or len({tuple(t) for t in tokens.values()}) > 1:
+            raise ValueError(f"tools/strings-android.json {name}: missing {missing} or arguments differ {tokens}")
         for loc in FOLDERS:
             formatted = has_arguments(texts["en"]) or "%" not in texts["en"]
             result.locales[loc][name] = Resource(text=texts[loc], formatted=formatted)
     chosen: dict[str, dict] = {}
     for catalog in catalogs:
         for key, item in catalog["strings"].items():
-            if key not in chosen or (not complete(chosen[key]) and complete(item)):
+            if key not in chosen or rank(item) > rank(chosen[key]):
                 chosen[key] = item
     for key, item in chosen.items():
+        if not key.strip():
+            continue
         if item.get("extractionState") == "stale":
             result.stale += 1
             continue
@@ -213,6 +248,7 @@ def build(catalogs: list[dict], keymap: dict[str, str], android: dict[str, dict[
             if res.quantities is not None and loc in MANY_FROM_OTHER and "many" not in res.quantities:
                 res.quantities["many"] = res.quantities["other"]
             result.locales[loc][name] = res
+    result.keymap = {**keymap, **result.keymap}
     return result
 
 
@@ -222,6 +258,8 @@ def escape(text: str) -> str:
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     if text[:1] in ("@", "?"):
         text = "\\" + text
+    if text and not text.strip(" "):
+        return "\\u0020" * len(text)
     if text != text.strip(" "):
         stripped = text.strip(" ")
         lead = len(text) - len(text.lstrip(" "))
@@ -281,12 +319,15 @@ def main() -> int:
         for path in stale:
             print(f"out of date: {path.relative_to(ROOT)}", file=sys.stderr)
         return 1 if stale or result.rejected else 0
+    if result.rejected:
+        print("nothing written: fix the rejected keys in the iOS catalogs first", file=sys.stderr)
+        return 1
     for path, text in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
     counts = {loc: len(res) for loc, res in result.locales.items()}
     print(f"wrote {counts} ({result.stale} stale keys skipped)")
-    return 1 if result.rejected else 0
+    return 0
 
 
 if __name__ == "__main__":

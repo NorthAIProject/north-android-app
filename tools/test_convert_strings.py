@@ -111,8 +111,7 @@ class ConvertTest(unittest.TestCase):
         self.assertEqual("Always dark", result.locales["en"]["appearance_dark"].text)
 
     def test_new_key_gets_a_snake_case_name_from_its_english_text(self):
-        result = build({"How's the week, José?": entry(), "1 rest day": entry(), "%@ · %@": entry(), "": entry()})
-        self.assertEqual("empty", result.keymap[""])
+        result = build({"How's the week, José?": entry(), "1 rest day": entry(), "%@ · %@": entry()})
         self.assertEqual("hows_the_week_jose", result.keymap["How's the week, José?"])
         self.assertEqual("text_1_rest_day", result.keymap["1 rest day"])
         self.assertEqual("x_x", result.keymap["%@ · %@"])
@@ -146,6 +145,65 @@ class ConvertTest(unittest.TestCase):
         self.assertEqual([], result.untranslated)
 
 
+    def test_a_live_copy_wins_over_a_stale_one_in_another_catalog(self):
+        stale = {"sourceLanguage": "en", "strings": {"Back to mood": dict(entry(), extractionState="stale")}}
+        live = {"sourceLanguage": "en", "strings": {"Back to mood": entry(es="Volver", pt_PT="a", pt_BR="b")}}
+        result = cs.build([stale, live], {}, {})
+        self.assertEqual("Volver", result.locales["es"]["back_to_mood"].text)
+        self.assertEqual(0, result.stale)
+
+    def test_a_key_that_drops_out_keeps_its_name_and_no_new_key_takes_it(self):
+        result = build({"Save!": entry()}, keymap={"Save": "save"})
+        self.assertEqual({"Save": "save", "Save!": "save_2"}, result.keymap)
+
+    def test_an_android_name_equal_to_a_mapped_name_fails(self):
+        android = {"save": {"en": "Save", "es": "a", "pt-PT": "b", "pt-BR": "c"}}
+        with self.assertRaises(ValueError):
+            build({"Save": entry()}, keymap={"Save": "save"}, android=android)
+
+    def test_an_android_string_missing_a_locale_or_with_other_arguments_fails(self):
+        with self.assertRaises(ValueError):
+            build({}, android={"a": {"en": "A", "es": "a", "pt-PT": "a"}})
+        with self.assertRaises(ValueError):
+            build({}, android={"a": {"en": "%1$s A", "es": "a", "pt-PT": "a", "pt-BR": "a"}})
+
+    def test_an_english_only_android_string_is_not_translatable(self):
+        result = build({}, android={"brand_name": {"en": "Khepri"}})
+        self.assertIn('<string name="brand_name" translatable="false">Khepri</string>', cs.render(result.locales["en"]))
+        self.assertNotIn("brand_name", result.locales["es"])
+
+    def test_an_unsupported_specifier_is_rejected_not_emitted_as_literal(self):
+        result = build({"Time %02d:%02d": entry(), "Rest %s": entry()})
+        self.assertEqual({"Time %02d:%02d", "Rest %s"}, {key for key, _ in result.rejected})
+
+    def test_a_translation_that_adds_an_argument_to_a_literal_is_rejected(self):
+        result = build({"Carbs, % of target": entry(es="Carbohidratos, %@")})
+        self.assertEqual(["Carbs, % of target"], [key for key, _ in result.rejected])
+
+    def test_decimals_and_plain_integers_convert(self):
+        result = build({"%.1f kg in %d days": entry()})
+        self.assertEqual("%1$.1f kg in %2$d days", result.locales["en"][result.keymap["%.1f kg in %d days"]].text)
+
+    def test_empty_keys_and_empty_values_are_not_emitted(self):
+        result = build({"": entry(), "Name": entry(es="")})
+        self.assertEqual({}, result.keymap)
+        self.assertEqual(["Name"], [key for key, _ in result.rejected])
+
+    def test_a_plural_without_other_is_rejected(self):
+        one = {"variations": {"plural": {"one": unit("%lld set")}}}
+        strings = {"%lld sets": {"localizations": {"en": one, "es": one, "pt-PT": one, "pt-BR": one}}}
+        self.assertEqual(["%lld sets"], [key for key, _ in build(strings).rejected])
+
+    def test_backslashes_newlines_question_marks_and_spaces_are_escaped(self):
+        self.assertEqual("a\\\\b\\nc", cs.escape("a\\b\nc"))
+        self.assertEqual("\\?why", cs.escape("?why"))
+        self.assertEqual("\\u0020kg", cs.escape(" kg"))
+        self.assertEqual("\\u0020\\u0020", cs.escape("  "))
+
+    def test_java_keywords_get_a_suffix(self):
+        self.assertEqual("new_text", build({"New": entry()}).keymap["New"])
+
+
 class CheckTranslationsTest(unittest.TestCase):
     def write(self, root, folder, body):
         path = root / "feature/x/src/main/res" / folder / "strings.xml"
@@ -174,6 +232,24 @@ class CheckTranslationsTest(unittest.TestCase):
                 ["feature/x/src/main/res values-pt-rBR: not in values: z"], check_translations.problems(root)
             )
 
+
+    def test_reports_a_kind_change_an_empty_translation_and_a_plural_without_other(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            body = '<string name="a">A</string><plurals name="p"><item quantity="other">P</item></plurals>'
+            self.write(root, "values", body)
+            self.write(root, "values-es", '<plurals name="a"><item quantity="other">A</item></plurals>'
+                       '<plurals name="p"><item quantity="other">P</item></plurals>')
+            self.write(root, "values-pt-rPT", '<string name="a"> </string><plurals name="p"><item quantity="other">P</item></plurals>')
+            self.write(root, "values-pt-rBR", '<string name="a">A</string><plurals name="p"><item quantity="one">P</item></plurals>')
+            self.assertEqual(
+                [
+                    "feature/x/src/main/res values-es: different kind: a",
+                    "feature/x/src/main/res values-pt-rPT: a is empty",
+                    "feature/x/src/main/res values-pt-rBR: p has no other",
+                ],
+                check_translations.problems(root),
+            )
 
 if __name__ == "__main__":
     unittest.main()
