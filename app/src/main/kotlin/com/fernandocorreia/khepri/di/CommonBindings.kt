@@ -1,6 +1,7 @@
 package com.fernandocorreia.khepri.di
 
 import com.fernandocorreia.khepri.BuildConfig
+import com.fernandocorreia.khepri.core.api.ApiJson
 import com.fernandocorreia.khepri.core.common.ApiBaseUrl
 import com.fernandocorreia.khepri.core.common.ApplicationScope
 import com.fernandocorreia.khepri.core.common.ConsentSignal
@@ -9,6 +10,7 @@ import com.fernandocorreia.khepri.core.common.DefaultDispatcherProvider
 import com.fernandocorreia.khepri.core.common.DispatcherProvider
 import com.fernandocorreia.khepri.core.common.SharedFlowConsentSignal
 import com.fernandocorreia.khepri.core.common.SharedFlowDataChangeBus
+import com.fernandocorreia.khepri.core.common.WireJson
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -19,6 +21,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.serialization.json.Json
 
 /** Hilt bindings for `:core:model` and `:core:common`, which are plain Kotlin and cannot hold Hilt modules. */
 @Module
@@ -39,5 +42,7 @@ internal abstract class CommonBindings {
         fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         @Provides @ApiBaseUrl fun apiBaseUrl(): String = BuildConfig.API_BASE_URL
+
+        @Provides @WireJson fun wireJson(): Json = ApiJson.default
     }
 }

@@ -19,7 +19,15 @@ rootProject.name = "khepri"
 
 include(":app")
 
-include(":core:model", ":core:common", ":core:api", ":core:network", ":core:datastore", ":core:session")
+include(
+    ":core:model",
+    ":core:common",
+    ":core:api",
+    ":core:network",
+    ":core:datastore",
+    ":core:database",
+    ":core:session",
+)
 
 include(":core:designsystem", ":core:ui", ":core:testing", ":core:navigation")
 

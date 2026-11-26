@@ -142,13 +142,15 @@ public data class StoredValue<T>(val value: T, val fetchedAt: Instant)
 - `DatabaseCleaner.afterLogout` clears every table for both reasons (only the snapshot table exists in Phase 2).
 - Database file `khepri.db`; backup rules already exclude the `database` domain.
 
-- [ ] **Step 1:** Add the owner-approved Room line to the catalog and a throwaway one-entity build of `:core:database`; run `./gradlew :core:database:assembleDebug`. If KSP fails against Kotlin 2.4.21, switch to the other approved line and record why in this task's Done notes.
-- [ ] **Step 2:** `SnapshotDaoTest`: put then observe; same `(account, key)` replaces; another account's row is invisible; `clearAll` empties; `deleteWithPrefixExcept` keeps exactly the listed keys.
-- [ ] **Step 3:** `SnapshotCacheTest`: round-trips a serializable value with `fetchedAt` from the injected clock; an undecodable row observes `null` and is gone afterwards; `keepOnly("day:", {today, yesterday})` drops older days and touches no other prefix.
-- [ ] **Step 4:** `DatabaseCleanerTest`: rows are gone after `afterLogout(Explicit)` and after `afterLogout(Unauthorized)`.
-- [ ] **Step 5:** Implement. Run; expect PASS. Schema JSON committed under `core/database/schemas`.
-- [ ] **Step 6:** `HiltGraphTest`: `SnapshotCache` resolves; the cleaner set contains `DatabaseCleaner`.
-- [ ] **Step 7:** `./gradlew check`; commit.
+- [x] **Step 1:** Add the owner-approved Room line to the catalog and a throwaway one-entity build of `:core:database`; run `./gradlew :core:database:assembleDebug`. If KSP fails against Kotlin 2.4.21, switch to the other approved line and record why in this task's Done notes.
+- [x] **Step 2:** `SnapshotDaoTest`: put then observe; same `(account, key)` replaces; another account's row is invisible; `clearAll` empties; `deleteWithPrefixExcept` keeps exactly the listed keys.
+- [x] **Step 3:** `SnapshotCacheTest`: round-trips a serializable value with `fetchedAt` from the injected clock; an undecodable row observes `null` and is gone afterwards; `keepOnly("day:", {today, yesterday})` drops older days and touches no other prefix.
+- [x] **Step 4:** `DatabaseCleanerTest`: rows are gone after `afterLogout(Explicit)` and after `afterLogout(Unauthorized)`.
+- [x] **Step 5:** Implement. Run; expect PASS. Schema JSON committed under `core/database/schemas`.
+- [x] **Step 6:** `HiltGraphTest`: `SnapshotCache` resolves; the cleaner set contains `DatabaseCleaner`.
+- [x] **Step 7:** `./gradlew check`; commit.
+
+Done 2026-11-26. Room 3.0.3 compiles with KSP 2.3.14 and Kotlin 2.4.21, so the 2.8.5 fallback was not needed. Notes: Room 3 lives in `androidx.room3` and renames `TypeConverter` to `ColumnTypeConverter`; it needs a driver, `AndroidSQLiteDriver` from `androidx.sqlite:sqlite-framework` (the version Room 3 is built against, 2.7.1); `room.generateKotlin` is gone (Kotlin is the only output). The cache gets the API's `Json` through `@WireJson` (in `:core:common`, provided by `:app` as `ApiJson.default`), since `:core:database` may not see `:core:api`. `DatabaseCleaner` calls `clearAllTables()`, so a table added later is emptied too. The prefix delete uses `substr`, not `LIKE`, so `_` and `%` in a prefix are literal.
 
 ---
 

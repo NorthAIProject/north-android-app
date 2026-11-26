@@ -33,6 +33,8 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 - Infrastructure changes go only in `../../../platform/infra` (the `LuminaVaultInfra` repo); merging there deploys.
 - No paid speech API. Use on-device recognition or the backend's `/voice/transcribe`.
 - Tests never use a real API key; use stub servers.
+- Room is Room 3 (`androidx.room3`): `ColumnTypeConverter`, not `TypeConverter`, and a driver is required (`AndroidSQLiteDriver`). Every table holds account data; `DatabaseCleaner` empties them all at sign-out.
+- A ViewModel test that relies on `stateIn` or `viewModelScope.launch` runs as a plain test, not inside `runTest`: under `runTest` the test Main queues those launches and they never run before the assertions.
 
 ## Code style
 

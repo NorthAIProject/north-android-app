@@ -84,8 +84,10 @@ androidComponents {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:api"))
     implementation(project(":core:network"))
     implementation(project(":core:datastore"))
+    implementation(project(":core:database"))
     implementation(project(":core:navigation"))
     implementation(libs.datastore.preferences)
     implementation(project(":core:session"))
@@ -99,6 +101,7 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.process)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.activity.compose)
     implementation(libs.compose.ui.tooling.preview)
     testImplementation(libs.hilt.android.testing)
