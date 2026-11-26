@@ -5,9 +5,11 @@ import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriColors
 import com.fernandocorreia.khepri.core.designsystem.theme.Radii
 import com.fernandocorreia.khepri.core.designsystem.theme.Spacing
+import com.fernandocorreia.khepri.core.designsystem.theme.geistTypography
 import com.fernandocorreia.khepri.core.designsystem.theme.scheme
 import kotlin.math.roundToInt
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -41,6 +43,12 @@ class ThemeTokensTest {
     fun `spacing scale`() {
         val s = Spacing()
         assertEquals(listOf(4.dp, 8.dp, 12.dp, 16.dp, 20.dp, 24.dp), listOf(s.xs, s.sm, s.md, s.lg, s.xl, s.xxl))
+    }
+
+    @Test
+    fun `Material styles carry no letter spacing, as on iOS`() {
+        val styles = with(geistTypography()) { listOf(displayLarge, titleMedium, bodyLarge, bodyMedium, labelLarge) }
+        styles.forEach { assertEquals(0.sp, it.letterSpacing) }
     }
 
     private fun Color.contrastWith(other: Color, background: Color): Double {

@@ -45,9 +45,12 @@ public data class KhepriTextStyles(
         ),
 )
 
+/**
+ * Material's type scale in Geist, with no letter spacing: the baseline tracking is tuned for Roboto, and iOS sets none.
+ */
 internal fun geistTypography(): Typography {
     val base = Typography()
-    fun TextStyle.geist() = copy(fontFamily = GeistFamily)
+    fun TextStyle.geist() = copy(fontFamily = GeistFamily, letterSpacing = 0.sp)
     return Typography(
         displayLarge = base.displayLarge.geist(),
         displayMedium = base.displayMedium.geist(),

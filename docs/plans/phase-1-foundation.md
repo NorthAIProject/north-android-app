@@ -474,7 +474,7 @@ The owner's rule is a Fable review after every task. This review covered Tasks 4
 
 ### Fable review of Task 8 (2026-11-25)
 
-Eleven findings. Fixed: 1 to 10. Left for the owner: 11.
+Eleven findings, all fixed (11 after the owner's verdict).
 
 1. The card edge replaced the hairline alpha instead of scaling it. It was 8 to 10 times stronger than iOS `hairline.opacity(0.6)`; it now multiplies.
 2. The text field outline was `border` (about 1.4:1). It is now the web's `--input` token (3.3:1 light, 3.4:1 dark). `sync_theme.py` emits `input`.
@@ -486,7 +486,7 @@ Eleven findings. Fixed: 1 to 10. Left for the owner: 11.
 8. The two colour schemes are built once, not on every recomposition.
 9. `KhepriTextField` takes `visualTransformation`, `keyboardActions` and `enabled`, which the sign-in screen needs. `TrailingAction` is a data class.
 10. `:core:testing` exposes coroutines-test and JUnit Jupiter as `api`; `:core:ui` exposes `:core:model`.
-11. **Owner verdict:** Material's baseline letter spacing (0.5 sp on `bodyLarge`, tuned for Roboto) is still applied to Geist, where iOS uses none.
+11. Material's baseline letter spacing (0.5 sp on `bodyLarge`, tuned for Roboto) was applied to Geist, where iOS uses none. On the owner's verdict (2026-11-26) every Material style now has 0 sp; only the eyebrow keeps its 1.5 sp, as on iOS.
 
 Note: Material 3 1.5 outlined buttons label in `onSurfaceVariant` (muted), not `primary`. That is the library default and is kept.
 
