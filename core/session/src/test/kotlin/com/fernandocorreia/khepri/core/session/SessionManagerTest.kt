@@ -202,6 +202,17 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `cleaners clear memory after the account is gone, so a late write finds no account`() = runTest {
+        val manager = manager()
+        manager.start()
+        var seen: String? = "unset"
+        onAfterPush = { seen = manager.account.value }
+        manager.signOut(SignOutReason.Explicit)
+        assertNull(seen)
+        assertEquals(AppPhase.SignedOut, manager.phase.value)
+    }
+
+    @Test
     fun `a storage error on launch is Locked, not a crash`() = runTest {
         store.readFailure = java.io.IOException("disk")
         val manager = manager()

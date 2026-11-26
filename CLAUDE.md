@@ -34,6 +34,7 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 - No paid speech API. Use on-device recognition or the backend's `/voice/transcribe`.
 - Tests never use a real API key; use stub servers.
 - Room is Room 3 (`androidx.room3`): `ColumnTypeConverter`, not `TypeConverter`, and a driver is required (`AndroidSQLiteDriver`). Every table holds account data; `DatabaseCleaner` empties them all at sign-out.
+- A refresh captures `SignedInState.account` before the call and writes only if it is unchanged: on disk through `SnapshotCache.putIf` (checked inside the write transaction), in memory under the lock its `SignOutCleaner` clears under. Sign-out clears `account` before the cleaners run. A `SignOutCleaner` takes `Provider<SignedInState>`: the session holds the cleaner set, so a direct injection is a Hilt cycle.
 - A ViewModel test that relies on `stateIn` or `viewModelScope.launch` runs as a plain test, not inside `runTest`: under `runTest` the test Main queues those launches and they never run before the assertions.
 
 ## Code style

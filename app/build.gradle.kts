@@ -97,6 +97,7 @@ dependencies {
     implementation(project(":feature:auth:domain"))
     implementation(project(":feature:auth:ui"))
     implementation(project(":feature:auth:data"))
+    implementation(project(":feature:today:data"))
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.process)

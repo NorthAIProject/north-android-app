@@ -30,6 +30,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * cleaner tears down) never leaves a transition half done. A session past its `expiresAt` is kept: a 401 is the only
  * expiry signal.
  */
+// The session itself, not data of an account: it runs the cleaners and sets the phase and account at sign-out.
+@Suppress("AccountStateNeedsCleaner")
 @Singleton
 public class SessionManager
 @Inject
@@ -133,6 +135,9 @@ constructor(
         }
         bestEffort { store.clear() }
         userId = null
+        // Before the cleaners: a write that checks the account after this finds none, and one that checked before is
+        // wiped by them. Not earlier, or navigation resets under the signed-in screen during the server steps.
+        accountFlow.value = null
         cleaners.forEach { bestEffort { it.afterLogout(reason) } }
         moveTo(AppPhase.SignedOut)
     }

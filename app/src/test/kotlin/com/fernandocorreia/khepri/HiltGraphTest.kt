@@ -61,8 +61,9 @@ class HiltGraphTest {
     }
 
     @Test
-    fun `sign-out empties the database and forgets the consent answer`() {
+    fun `sign-out empties the database and forgets the consent answer and Today's memory`() {
         val kinds = cleaners.map { it::class.java.simpleName }
-        assertTrue(kinds.toString(), "DatabaseCleaner" in kinds && "AiConsentRepositoryImpl" in kinds)
+        val expected = listOf("DatabaseCleaner", "AiConsentRepositoryImpl", "TodayRepositoryImpl")
+        assertTrue(kinds.toString(), kinds.containsAll(expected))
     }
 }
