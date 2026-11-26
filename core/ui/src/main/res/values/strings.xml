@@ -193,6 +193,8 @@
     <string name="bodyweight">Bodyweight</string>
     <string name="born">Born</string>
     <string name="bot">Bot</string>
+    <string name="brand_name" translatable="false">Khepri</string>
+    <string name="brand_tagline" translatable="false">Your AI operating system for personal growth.</string>
     <string name="bring_a_key_from_a_provider_you_already">Bring a key from a provider you already pay for. It is stored encrypted and never shown again.</string>
     <string name="bring_in_apple_health">Bring in Apple Health</string>
     <string name="build">Build</string>

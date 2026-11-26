@@ -18,7 +18,7 @@ class FeatureDomainPlugin : Plugin<Project> {
         }
 }
 
-/** `feature:x:data`. Add `:core:database` or `:core:datastore` per module. */
+/** `feature:x:data`. Add `:core:common`, `:core:database` or `:core:datastore` per module, as used. */
 class FeatureDataPlugin : Plugin<Project> {
     override fun apply(target: Project) =
         with(target) {
@@ -26,14 +26,16 @@ class FeatureDataPlugin : Plugin<Project> {
             pluginManager.apply("khepri.hilt")
             dependencies {
                 add("implementation", project(sibling("domain")))
-                listOf(":core:model", ":core:common", ":core:api", ":core:network").forEach {
+                listOf(":core:model", ":core:api", ":core:network").forEach {
                     add("implementation", project(it))
                 }
+                // The generated interfaces return retrofit2.Response, which apiCall takes.
+                add("implementation", lib("retrofit"))
             }
         }
 }
 
-/** `feature:x:ui`. Never sees `feature:x:data` or `:core:api`. */
+/** `feature:x:ui`. Never sees `feature:x:data` or `:core:api`. Add `:core:navigation` per module, as used. */
 class FeatureUiPlugin : Plugin<Project> {
     override fun apply(target: Project) =
         with(target) {
@@ -43,7 +45,7 @@ class FeatureUiPlugin : Plugin<Project> {
             pluginManager.apply("khepri.screenshot")
             dependencies {
                 add("implementation", project(sibling("domain")))
-                listOf(":core:ui", ":core:designsystem", ":core:navigation").forEach {
+                listOf(":core:ui", ":core:designsystem").forEach {
                     add("implementation", project(it))
                 }
             }

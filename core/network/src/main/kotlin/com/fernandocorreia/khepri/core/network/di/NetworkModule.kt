@@ -1,14 +1,13 @@
 package com.fernandocorreia.khepri.core.network.di
 
 import android.os.LocaleList
-import com.fernandocorreia.khepri.core.api.JsonConverterFactory
-import com.fernandocorreia.khepri.core.api.QueryValueConverterFactory
 import com.fernandocorreia.khepri.core.common.ApiBaseUrl
 import com.fernandocorreia.khepri.core.network.BearerInterceptor
 import com.fernandocorreia.khepri.core.network.LanguageInterceptor
 import com.fernandocorreia.khepri.core.network.LongCallInterceptor
 import com.fernandocorreia.khepri.core.network.PreferredLanguages
 import com.fernandocorreia.khepri.core.network.RetryInterceptor
+import com.fernandocorreia.khepri.core.network.khepriRetrofit
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -104,10 +103,5 @@ internal object NetworkModule {
     @Provides
     @Singleton
     fun retrofit(@ApiBaseUrl baseUrl: String, @DefaultClient client: OkHttpClient): Retrofit =
-        Retrofit.Builder()
-            .baseUrl("${baseUrl.trimEnd('/')}/api/v1/")
-            .client(client)
-            .addConverterFactory(QueryValueConverterFactory)
-            .addConverterFactory(JsonConverterFactory)
-            .build()
+        khepriRetrofit(baseUrl, client)
 }

@@ -1,4 +1,10 @@
 {
+  "brand_name": {
+    "en": "Khepri"
+  },
+  "brand_tagline": {
+    "en": "Your AI operating system for personal growth."
+  },
   "error_generic_body": {
     "en": "Something went wrong on our side. Try again in a moment.",
     "es": "Algo ha fallado por nuestra parte. Inténtalo de nuevo en un momento.",
