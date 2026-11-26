@@ -1,6 +1,9 @@
 package com.fernandocorreia.khepri.core.navigation
 
+import java.io.UnsupportedEncodingException
 import java.net.URI
+import java.net.URISyntaxException
+import java.net.URLDecoder
 
 /**
  * Maps `khepri://…` links, `https://kheprios.com/app/…` URLs and bare server paths onto a destination, line by line
@@ -34,7 +37,7 @@ public object DeepLinkParser {
     private val moods = 1..5
 
     public fun parse(link: String): AppDestination? {
-        val uri = link.takeIf { it.isNotBlank() }?.let { runCatching { URI(it) }.getOrNull() }
+        val uri = link.takeIf { it.isNotBlank() }?.let { uriOf(it) ?: uriOf(encodeIllegal(it)) }
         val parts = uri?.let(::parts)
         val mood = uri?.let(::mood)?.takeIf { it in moods }
         return when {
@@ -59,13 +62,45 @@ public object DeepLinkParser {
         }
     }
 
+    /** `mood` from the raw query, each item decoded on its own as `URLComponents.queryItems` does. */
     private fun mood(uri: URI): Int? =
-        uri.query
+        uri.rawQuery
             ?.split('&')
-            ?.firstOrNull { it.substringBefore('=') == "mood" }
-            ?.substringAfter('=', missingDelimiterValue = "")
-            ?.toIntOrNull()
+            ?.map { it.substringBefore('=').decoded() to it.substringAfter('=', missingDelimiterValue = "").decoded() }
+            ?.firstOrNull { (name, _) -> name == "mood" }
+            ?.second
+            ?.swiftInt()
+
+    private fun uriOf(text: String): URI? =
+        try {
+            URI(text)
+        } catch (expected: URISyntaxException) {
+            null
+        }
+
+    /** Percent-encodes what `java.net.URI` rejects (spaces, non-ASCII), as Foundation does before parsing. */
+    private fun encodeIllegal(text: String): String = buildString {
+        text.forEach { c ->
+            if (c in allowed) append(c) else c.toString().toByteArray().forEach { append("%%%02X".format(it)) }
+        }
+    }
+
+    private val allowed: Set<Char> = (('a'..'z') + ('A'..'Z') + ('0'..'9') + "-._~:/?#[]@!$&'()*+,;=%".toList()).toSet()
+
+    private fun String.decoded(): String =
+        try {
+            URLDecoder.decode(replace("+", "%2B"), "UTF-8")
+        } catch (expected: IllegalArgumentException) {
+            this
+        } catch (expected: UnsupportedEncodingException) {
+            this
+        }
 }
+
+/** Swift `Int(_:)`: an optional sign and ASCII digits only; Kotlin's parser also takes other scripts' digits. */
+internal fun String.swiftInt(): Int? = takeIf { swiftDigits.matches(it) }?.toIntOrNull()
+
+private val swiftDigits = Regex("[+-]?[0-9]+")
 
 /** The path rules of iOS `destination(forPath:)`, in its order. Indices name path segments. */
 private object PathRules {
@@ -84,7 +119,7 @@ private object PathRules {
             ?: byFirst(parts.firstOrNull())
 
     private fun training(parts: List<String>): AppDestination? {
-        val day = parts.getOrNull(THIRD)?.toIntOrNull()
+        val day = parts.getOrNull(THIRD)?.swiftInt()
         return when {
             parts.firstOrNull() != "training" || parts.size < 2 -> null
             parts[1] == "next" ->

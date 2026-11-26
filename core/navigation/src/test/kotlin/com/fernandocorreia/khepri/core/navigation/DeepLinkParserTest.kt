@@ -140,6 +140,14 @@ class DeepLinkParserTest {
                 row("khepri://decisions/$UPPER/extra", Section("decisions")),
                 row("khepri://check-ins?mood=0", Section("check-ins")),
                 row("khepri://check-ins?mood=", Section("check-ins")),
+                // URLComponents decodes each query item after splitting, so an encoded & is not a separator.
+                row("khepri://check-ins?x=a%26mood%3D5", Section("check-ins")),
+                row("khepri://check-ins?mood=%35", CheckIn(5)),
+                // Swift Int() takes ASCII digits only.
+                row("khepri://check-ins?mood=\u0664", Section("check-ins")),
+                row("khepri://training/p/\u0663", DeepLinkParser.parse("khepri://training/p/x")),
+                // Foundation encodes a space before parsing; the path segment comes back decoded.
+                row("khepri://exercises/bench press", Exercise("bench press")),
                 row("khepri://check-ins?other=1&mood=3", CheckIn(3)),
                 row("khepri://training/next/start/now", NextWorkout(start = false)),
                 row("khepri://i/c/AbC123xYz", null),

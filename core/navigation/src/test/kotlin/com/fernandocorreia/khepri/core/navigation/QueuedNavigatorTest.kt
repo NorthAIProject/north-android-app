@@ -1,6 +1,7 @@
 package com.fernandocorreia.khepri.core.navigation
 
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -64,5 +65,21 @@ class QueuedNavigatorTest {
         navigator.open(AppDestination.Invite("abc123xyz9"))
         runCurrent()
         assertEquals(listOf(NavCommand.Open(AppDestination.Invite("abc123xyz9"))), navigator.takeAll())
+    }
+
+    @Test
+    fun `drop also discards commands still on their way, and later ones queue`() = runTest {
+        links.gate = CompletableDeferred()
+        val navigator = navigator()
+        navigator.open(AppDestination.Invite("abc123xyz9"))
+        navigator.pop()
+        runCurrent()
+        navigator.drop()
+        links.gate?.complete(Unit)
+        runCurrent()
+        assertEquals(emptyList<NavCommand>(), navigator.takeAll())
+        navigator.popToRoot()
+        runCurrent()
+        assertEquals(listOf(NavCommand.PopToRoot), navigator.takeAll())
     }
 }

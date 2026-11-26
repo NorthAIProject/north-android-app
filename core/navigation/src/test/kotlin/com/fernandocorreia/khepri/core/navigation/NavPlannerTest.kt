@@ -47,6 +47,18 @@ class NavPlannerTest {
     }
 
     @Test
+    fun `a link that leaves a tab takes the tab's sheet with it`() {
+        val sheetOnToday = open(AppDestination.WeeklyReview).state
+        val plan = open(AppDestination.Goal("g1"), sheetOnToday)
+        assertEquals(More, plan.state.selected)
+        assertEquals(listOf(root(Today)), plan.state.stack(Today))
+        assertEquals(
+            listOf(root(Today)),
+            NavPlanner.plan(sheetOnToday, NavCommand.Select(More)) { "o" }.state.stack(Today),
+        )
+    }
+
+    @Test
     fun `the same sheet is not stacked twice and a new sheet replaces the one on top`() {
         val once = open(AppDestination.Exercise("push-up")).state
         assertEquals(once, open(AppDestination.Exercise("push-up"), once).state)

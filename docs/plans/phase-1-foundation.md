@@ -576,6 +576,18 @@ interface Navigator { fun open(destination: AppDestination); fun open(link: Stri
 - **Fixed on the way:** `error_state_server.png` had been re-recorded as an empty window in 6725eab. Dark `ErrorState` captures were intermittently blank under Robolectric when the composition started in Dark; the test now draws a Light frame first, as `ComponentScreenshotTest` does (6 of 6 recordings stable).
 
 
+**Fable review of Task 9 (2026-11-26).** The parser and planner match iOS for every ASCII link. All seven lifecycle findings are fixed:
+
+1. Saved stacks now carry their owner. `SignedInState` exposes `account` (the user id while signed in) in place of a boolean. Stacks restored for another account start from the roots, and links queued meanwhile still land. This covers a sign-out written after `onSaveInstanceState` and a token rejected at launch.
+2. A tab that leaves composition is settled: entries it showed and no longer holds are cleared and marked stale. This catches a pop and a tab change in the same frame. `TabHost` reports `composing(tab)` and `leaving(tab)`, so a late dispose cannot unsettle the tab now shown.
+3. `QueuedNavigator` stamps each command with a generation. `drop()` also discards commands still in the intake or waiting on `PendingLinks`.
+4. A tab that is left loses its sheet, as on iOS. Sheets are never saved.
+5. The parser reads the raw query and decodes each item, accepts ASCII digits only (Swift `Int()`), and percent-encodes illegal characters before giving up (`khepri://exercises/bench press`).
+6. `epoch` is saved.
+7. The sign-out cleaner suspends `TabHost` until the next sign-in, so no screen loads with a session being torn down.
+
+Also: the entry provider is remembered per installer set, so the sheet scene keeps its identity across recompositions.
+
 ### Task 10: Strings pipeline
 
 **Files:**
@@ -593,11 +605,26 @@ interface Navigator { fun open(destination: AppDestination); fun open(link: Stri
 **Done (2026-11-26).** 1,999 strings and 2 plurals per locale from 2,080 catalog keys (75 shared between catalogs, emitted once, preferring a translated copy). 19 tool tests run in `check` as `testStringTools`; `checkTranslations` runs there too, so CI covers both. Deviations:
 
 - **`tools/strings-android.json` holds copy only Android has.** iOS shows raw error text and has no localized error screen, so Task 8's five `error_*` strings live there and keep their names.
-- **Left out and listed by the converter:** 4 keys iOS has not translated (`High`, `Likely`, `Line`, the long body-figure credit) and 7 keys marked stale. iOS falls back to English for the first four; Android would fail `MissingTranslation`. Translate them in the iOS catalog, then regenerate.
+- **Left out and listed by the converter:** 4 keys iOS has not translated (`High`, `Likely`, `Line`, the long body-figure credit) and 4 keys marked stale (a stale copy no longer hides a live one in another catalog). iOS falls back to English for the first four; Android would fail `MissingTranslation`. Translate them in the iOS catalog, then regenerate.
 - **A string with no arguments is literal** (`formatted="false"`), as SwiftUI shows `About 60% of the sets`. A translation whose arguments differ from the English is rejected, not emitted (none today). Spanish and Portuguese plurals get `many` copied from `other` (CLDR).
 - **Lint's `PluralsCandidate`, `TypographyDashes`, `Typos` and `UnusedResources` are off in the generated files only.** The two typos are false positives (pt-PT `quilómetro`, "check-in in one tap"). The 82 plural candidates are real ("Check-in streak, 1 days") and exist on iOS too: fix them as plural variations in the iOS catalog and they regenerate as `<plurals>`. The 5 em dashes in iOS copy are kept as is.
 - `convert_strings.py --check` needs the iOS checkout beside this repo, so it is not in CI; run it after pulling iOS copy changes.
 
+
+**Fable review of Task 10 (2026-11-26).** Fixed:
+
+- A stale copy no longer shadows a live one in another catalog; this restores 3 widget strings.
+- The key map is never pruned, so a key that drops out for a run gets its old name back and no other key takes it.
+- A run with a rejected key writes nothing.
+- The tools import on macOS system Python 3.9 (`from __future__ import annotations`).
+- An Android-only name that equals a mapped name fails.
+- Android-only strings must cover every locale with the same arguments; English-only entries are emitted as `translatable="false"`.
+- Literal strings reject unsupported specifiers (`%02d`, `%s`) and translations that add arguments.
+- Empty keys, empty values and plurals without `other` are rejected.
+- Whitespace-only strings escape correctly.
+- `check_translations.py` also catches a kind change, an empty translation and a plural without `other`, in every source set.
+
+32 tool tests. Open: whether iOS groups `%lld` digits (12,345) in `Text` interpolation. 38 keys pair a number with a unit; check on a device before porting the first of those screens, and emit `%N$,d` if it does.
 
 ### Task 11: `:feature:auth` first slice — email sign-in and sign-up
 

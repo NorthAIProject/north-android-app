@@ -182,18 +182,18 @@ class SessionManagerTest {
     }
 
     @Test
-    fun `signedIn is true exactly while the phase is SignedIn`() = runTest {
+    fun `account is the session's user exactly while the phase is SignedIn`() = runTest {
         val manager = manager()
-        assertFalse(manager.signedIn.value)
+        assertNull(manager.account.value)
         manager.start()
-        assertTrue(manager.signedIn.value)
+        assertEquals(session.userId, manager.account.value)
         remote.me = Outcome.Ok(false)
         manager.start()
-        assertFalse(manager.signedIn.value)
+        assertNull(manager.account.value)
         remote.me = Outcome.Ok(true)
         manager.start()
         manager.signOut(SignOutReason.Explicit)
-        assertFalse(manager.signedIn.value)
+        assertNull(manager.account.value)
     }
 
     @Test
@@ -230,6 +230,6 @@ class SessionManagerTest {
         assertTrue(caller.isCancelled)
         assertTrue("after:tabs:Explicit:SignedIn" in journal.entries, journal.entries.toString())
         assertEquals(AppPhase.SignedOut, manager.phase.value)
-        assertFalse(manager.signedIn.value)
+        assertNull(manager.account.value)
     }
 }

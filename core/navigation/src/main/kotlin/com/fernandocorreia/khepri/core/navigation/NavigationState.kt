@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -31,6 +30,8 @@ import kotlinx.serialization.json.Json
  * phase switch, so a phase change keeps the stacks and sign-out clears them. Saved for process death in
  * [SavedStateHandle]. Applies `Navigator` commands while signed in.
  */
+// The navigation facade TabHost and the shell call; per-tab store bookkeeping already lives in TabMemory.
+@Suppress("TooManyFunctions")
 @HiltViewModel
 public class NavigationState
 internal constructor(
@@ -51,9 +52,10 @@ internal constructor(
     private val restored = SavedStacks.read(handle)
     private val stacks: Map<AppTab, SnapshotStateList<Route>> =
         AppTab.entries.associateWith { tab -> mutableStateListOf<Route>().apply { addAll(restored.stack(tab)) } }
-    private val stores = AppTab.entries.associateWith { ViewModelStore() }
-    private val providers = stores.mapValues { (_, store) -> ViewModelStoreProvider(store) }
-    private val stale = AppTab.entries.associateWith { mutableSetOf<String>() }
+    private val memory = TabMemory()
+
+    /** The account the stacks belong to; another account starts from the roots. */
+    private var owner: String? = restored.owner
     private val asks = MutableStateFlow<List<ScreenRequest>>(emptyList())
     private var nextAsk = 0L
 
@@ -64,7 +66,14 @@ internal constructor(
         private set
 
     /** Changes on every reset, so the host drops all composed state with the stacks. */
-    public var epoch: Int by mutableIntStateOf(0)
+    public var epoch: Int by mutableIntStateOf(restored.epoch)
+        private set
+
+    /**
+     * True from the sign-out reset until the next sign-in: the host draws nothing, so no screen loads with a session
+     * that is being torn down.
+     */
+    public var suspended: Boolean by mutableStateOf(false)
         private set
 
     /** Asks waiting for their screen. */
@@ -73,15 +82,15 @@ internal constructor(
     init {
         registry.live = this
         viewModelScope.launch {
-            combine(signedInState.signedIn, queue.pending) { signedIn, pending -> signedIn && pending.isNotEmpty() }
-                .filter { it }
-                .collect { queue.takeAll().forEach(::apply) }
-        }
-        viewModelScope.launch {
-            var wasSignedIn = signedInState.signedIn.value
-            signedInState.signedIn.collect { signedIn ->
-                if (wasSignedIn && !signedIn) reset()
-                wasSignedIn = signedIn
+            var first = true
+            var last: String? = null
+            combine(signedInState.account, queue.pending, ::Pair).collect { (account, pending) ->
+                if (first || account != last) {
+                    if (account != null) arrived(account) else if (last != null) reset()
+                    first = false
+                    last = account
+                }
+                if (account != null && pending.isNotEmpty()) queue.takeAll().forEach(::apply)
             }
         }
     }
@@ -97,23 +106,30 @@ internal constructor(
         apply(NavCommand.Select(tab))
     }
 
-    public fun provider(tab: AppTab): ViewModelStoreProvider = providers.getValue(tab)
+    public fun provider(tab: AppTab): ViewModelStoreProvider = memory.provider(tab)
 
     public fun consume(request: ScreenRequest) {
         asks.update { it - request }
     }
 
-    /** Called by `TabHost` while [tab]'s stack is composed, and with null when it leaves. */
-    public fun composing(tab: AppTab?) {
+    /** Called by `TabHost` when [tab]'s stack is composed. A tab still marked composed is settled first. */
+    public fun composing(tab: AppTab) {
+        composed?.takeIf { it != tab }?.let { memory.settle(it, stack(it).keys()) }
         composed = tab
+        memory.saw(tab, stack(tab).keys())
+    }
+
+    /**
+     * Called by `TabHost` when [tab]'s stack leaves composition. The tab is settled: entries removed in the frame it
+     * left in were never seen leaving by Navigation 3.
+     */
+    public fun leaving(tab: AppTab) {
+        memory.settle(tab, stack(tab).keys())
+        if (composed == tab) composed = null
     }
 
     /** Keys removed from [tab] while it was not composed: their saved state must go before the tab shows again. */
-    public fun takeStale(tab: AppTab): Set<String> {
-        val keys = stale.getValue(tab).toSet()
-        stale.getValue(tab).clear()
-        return keys
-    }
+    public fun takeStale(tab: AppTab): Set<String> = memory.takeStale(tab)
 
     internal fun apply(command: NavCommand) {
         val before = TabStacks(selected, stacks.mapValues { (_, stack) -> stack.toList() })
@@ -124,26 +140,33 @@ internal constructor(
         save()
     }
 
-    /** Back to every tab's root on Today with nothing kept: the next account never sees the last one's screens. */
-    public fun reset() {
-        providers.values.forEach { it.clearAllKeys() }
-        stores.values.forEach { it.clear() }
+    /** Sign-out: reset, and draw nothing until the next sign-in. */
+    internal fun signingOut() {
+        reset()
+        suspended = true
+    }
+
+    /**
+     * Back to every tab's root on Today with nothing kept: the next account never sees the last one's screens. Commands
+     * queued by the last session are dropped unless [keepQueue].
+     */
+    public fun reset(keepQueue: Boolean = false) {
+        memory.clear()
         stacks.forEach { (tab, stack) ->
             stack.clear()
             stack.add(Route.TabRoot(tab))
         }
-        stale.values.forEach { it.clear() }
+        owner = null
         selected = AppTab.Today
         asks.value = emptyList()
-        queue.drop()
+        if (!keepQueue) queue.drop()
         epoch++
         save()
     }
 
     override fun onCleared() {
         if (registry.live === this) registry.live = null
-        providers.values.forEach { it.clearAllKeys() }
-        stores.values.forEach { it.clear() }
+        memory.clear()
     }
 
     /**
@@ -152,37 +175,96 @@ internal constructor(
      */
     private fun replace(tab: AppTab, old: List<Route>, new: List<Route>) {
         if (old == new) return
-        if (tab != composed) {
-            val kept = new.map { it.contentKey() }.toSet()
-            old.map { it.contentKey() }
-                .filterNot(kept::contains)
-                .forEach { key ->
-                    provider(tab).clearKey(key)
-                    stale.getValue(tab).add(key)
-                }
-        }
+        if (tab != composed) memory.discard(tab, old.keys() - new.keys()) else memory.saw(tab, new.keys())
         val stack = stacks.getValue(tab)
         stack.clear()
         stack.addAll(new)
     }
 
+    private fun arrived(account: String) {
+        if (owner != null && owner != account) reset(keepQueue = true)
+        owner = account
+        suspended = false
+        save()
+    }
+
     private fun save() {
-        SavedStacks.write(handle, TabStacks(selected, stacks.mapValues { (_, stack) -> stack.toList() }))
+        val state = TabStacks(selected, stacks.mapValues { (_, stack) -> stack.toList() })
+        SavedStacks.write(handle, SavedStacks.Snapshot(state, owner, epoch))
     }
 }
 
-/** The stacks as JSON in [SavedStateHandle], for process death. Anything unreadable starts from the roots. */
+private fun List<Route>.keys(): Set<String> = map { it.contentKey() }.toSet()
+
+/**
+ * Each tab's ViewModel store, the keys it showed while composed, and the keys whose saved state must go before it shows
+ * again.
+ */
+private class TabMemory {
+    private val stores = AppTab.entries.associateWith { ViewModelStore() }
+    private val providers = stores.mapValues { (_, store) -> ViewModelStoreProvider(store) }
+    private val stale = AppTab.entries.associateWith { mutableSetOf<String>() }
+    private val shown = AppTab.entries.associateWith { mutableSetOf<String>() }
+
+    fun provider(tab: AppTab): ViewModelStoreProvider = providers.getValue(tab)
+
+    fun saw(tab: AppTab, keys: Set<String>) {
+        shown.getValue(tab).addAll(keys)
+    }
+
+    /** Clears what [tab] showed while composed and no longer holds. Clearing twice is harmless. */
+    fun settle(tab: AppTab, current: Set<String>) {
+        val seen = shown.getValue(tab)
+        discard(tab, seen - current)
+        seen.clear()
+    }
+
+    fun discard(tab: AppTab, keys: Set<String>) {
+        keys.forEach { key ->
+            provider(tab).clearKey(key)
+            stale.getValue(tab).add(key)
+        }
+    }
+
+    fun takeStale(tab: AppTab): Set<String> = stale.getValue(tab).toSet().also { stale.getValue(tab).clear() }
+
+    fun clear() {
+        providers.values.forEach { it.clearAllKeys() }
+        stores.values.forEach { it.clear() }
+        stale.values.forEach { it.clear() }
+        shown.values.forEach { it.clear() }
+    }
+}
+
+/**
+ * The stacks as JSON in [SavedStateHandle], for process death, with the account they belong to and the host's epoch.
+ * Sheets are not saved: iOS never restores one. Anything unreadable starts from the roots.
+ */
 private object SavedStacks {
     private const val KEY = "navigation"
     private val json = Json { ignoreUnknownKeys = true }
 
-    @Serializable private data class Saved(val selected: AppTab, val stacks: Map<AppTab, List<Route>>)
+    data class Snapshot(val state: TabStacks, val owner: String?, val epoch: Int) {
+        val selected: AppTab
+            get() = state.selected
 
-    fun write(handle: SavedStateHandle, state: TabStacks) {
-        handle[KEY] = json.encodeToString(Saved(state.selected, state.stacks))
+        fun stack(tab: AppTab): List<Route> = state.stack(tab)
     }
 
-    fun read(handle: SavedStateHandle): TabStacks {
+    @Serializable
+    private data class Saved(
+        val selected: AppTab,
+        val stacks: Map<AppTab, List<Route>>,
+        val owner: String? = null,
+        val epoch: Int = 0,
+    )
+
+    fun write(handle: SavedStateHandle, snapshot: Snapshot) {
+        val stacks = snapshot.state.stacks.mapValues { (_, stack) -> stack.dropLastWhile { it is Sheet } }
+        handle[KEY] = json.encodeToString(Saved(snapshot.selected, stacks, snapshot.owner, snapshot.epoch))
+    }
+
+    fun read(handle: SavedStateHandle): Snapshot {
         val saved =
             handle.get<String>(KEY)?.let {
                 try {
@@ -193,7 +275,9 @@ private object SavedStacks {
                     null
                 }
             }
-        return saved?.let { TabStacks(it.selected, it.stacks.filterValues { stack -> stack.isNotEmpty() }) }
-            ?: TabStacks.Roots
+        val state =
+            saved?.let { TabStacks(it.selected, it.stacks.filterValues { stack -> stack.isNotEmpty() }) }
+                ?: TabStacks.Roots
+        return Snapshot(state, saved?.owner, saved?.epoch ?: 0)
     }
 }

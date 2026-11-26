@@ -41,10 +41,13 @@ constructor(
 ) : SessionGateway, SignedInState {
     private val lock = Mutex()
     private val current = MutableStateFlow<AppPhase>(AppPhase.Launching)
-    private val signedInFlow = MutableStateFlow(false)
+    private val accountFlow = MutableStateFlow<String?>(null)
+
+    /** The user of the stored session, once it is read or saved; null after sign-out. */
+    private var userId: String? = null
 
     public val phase: StateFlow<AppPhase> = current.asStateFlow()
-    override val signedIn: StateFlow<Boolean> = signedInFlow.asStateFlow()
+    override val account: StateFlow<String?> = accountFlow.asStateFlow()
 
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -66,7 +69,10 @@ constructor(
             } catch (@Suppress("TooGenericExceptionCaught") expected: Exception) {
                 false
             }
-        if (saved) loadAccount()
+        if (saved) {
+            userId = session.userId
+            loadAccount()
+        }
         if (saved) Outcome.Ok(Unit) else Outcome.Err(AppError.Locked)
     }
 
@@ -91,6 +97,7 @@ constructor(
                 return moveTo(AppPhase.Locked)
             }
         if (session == null) return moveTo(AppPhase.SignedOut)
+        userId = session.userId
         moveTo(AppPhase.Launching)
         loadAccount()
     }
@@ -114,13 +121,14 @@ constructor(
             bestEffort { remote.logout() }
         }
         bestEffort { store.clear() }
+        userId = null
         cleaners.forEach { bestEffort { it.afterLogout(reason) } }
         moveTo(AppPhase.SignedOut)
     }
 
     private fun moveTo(phase: AppPhase) {
         current.value = phase
-        signedInFlow.value = phase == AppPhase.SignedIn
+        accountFlow.value = userId.takeIf { phase == AppPhase.SignedIn }
     }
 
     private suspend fun bestEffort(step: suspend () -> Unit) {

@@ -1,6 +1,7 @@
 package com.fernandocorreia.khepri.core.navigation
 
 import com.fernandocorreia.khepri.core.common.ApplicationScope
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -47,7 +48,8 @@ public interface PendingLinks {
 public class QueuedNavigator
 @Inject
 constructor(private val pendingLinks: PendingLinks, @ApplicationScope scope: CoroutineScope) : Navigator {
-    private val intake = Channel<NavCommand>(Channel.UNLIMITED)
+    private val intake = Channel<Stamped>(Channel.UNLIMITED)
+    private val generation = AtomicLong()
     private val queue = MutableStateFlow<List<NavCommand>>(emptyList())
 
     /** Commands not yet applied. */
@@ -55,42 +57,50 @@ constructor(private val pendingLinks: PendingLinks, @ApplicationScope scope: Cor
 
     init {
         scope.launch {
-            for (command in intake) {
-                keep(command)
-                queue.update { it + command }
+            for (stamped in intake) {
+                if (stamped.generation != generation.get()) continue
+                keep(stamped.command)
+                queue.update { if (stamped.generation == generation.get()) it + stamped.command else it }
             }
         }
     }
 
     override fun open(destination: AppDestination) {
-        intake.trySend(NavCommand.Open(destination))
+        send(NavCommand.Open(destination))
     }
 
     override fun open(link: String): Boolean = DeepLinkParser.parse(link)?.also(::open) != null
 
     override fun push(route: Route) {
-        intake.trySend(NavCommand.Push(route))
+        send(NavCommand.Push(route))
     }
 
     override fun pop() {
-        intake.trySend(NavCommand.Pop)
+        send(NavCommand.Pop)
     }
 
     override fun popToRoot() {
-        intake.trySend(NavCommand.PopToRoot)
+        send(NavCommand.PopToRoot)
     }
 
     override fun select(tab: AppTab) {
-        intake.trySend(NavCommand.Select(tab))
+        send(NavCommand.Select(tab))
     }
 
     /** Takes every queued command at once, in order. */
     public fun takeAll(): List<NavCommand> = queue.getAndUpdate { emptyList() }
 
-    /** Drops what the last session left queued. */
+    /** Drops what the last session left queued, including commands sent but not yet queued. */
     public fun drop() {
+        generation.incrementAndGet()
         queue.value = emptyList()
     }
+
+    private fun send(command: NavCommand) {
+        intake.trySend(Stamped(generation.get(), command))
+    }
+
+    private data class Stamped(val generation: Long, val command: NavCommand)
 
     @Suppress("TooGenericExceptionCaught")
     private suspend fun keep(command: NavCommand) {

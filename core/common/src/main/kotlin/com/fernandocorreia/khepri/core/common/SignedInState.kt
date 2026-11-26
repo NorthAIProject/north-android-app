@@ -2,7 +2,10 @@ package com.fernandocorreia.khepri.core.common
 
 import kotlinx.coroutines.flow.StateFlow
 
-/** True while the phase is SignedIn. Lets `:core:navigation` hold links without seeing `:core:session`. */
+/**
+ * Who is signed in. Lets `:core:navigation` hold links, and tie saved stacks to an account, without `:core:session`.
+ */
 public interface SignedInState {
-    public val signedIn: StateFlow<Boolean>
+    /** The signed-in user's id while the phase is SignedIn; null in every other phase. */
+    public val account: StateFlow<String?>
 }

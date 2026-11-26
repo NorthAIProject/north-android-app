@@ -19,6 +19,16 @@ public data class NavPlan(val state: TabStacks, val asks: List<ScreenAsk> = empt
 /** Pure: how each command changes the stacks. Follows iOS `AppRouter.open(_:)` and `MorePath`. */
 internal object NavPlanner {
     fun plan(state: TabStacks, command: NavCommand, newOpening: () -> String): NavPlan =
+        leaveSheets(state.selected, plain(state, command, newOpening))
+
+    /** iOS presents sheets from the tab view and never brings one back: a tab that is left loses its sheet. */
+    private fun leaveSheets(from: AppTab, plan: NavPlan): NavPlan {
+        val next = plan.state
+        if (next.selected == from || next.stack(from).last() !is Sheet) return plan
+        return plan.copy(state = next.with(from, next.stack(from).dropLastWhile { it is Sheet }, select = false))
+    }
+
+    private fun plain(state: TabStacks, command: NavCommand, newOpening: () -> String): NavPlan =
         when (command) {
             is NavCommand.Open -> open(state, command.destination, newOpening)
             is NavCommand.Push -> NavPlan(push(state, state.selected, command.route))

@@ -14,6 +14,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.fernandocorreia.khepri.core.navigation.AppTab
 import com.fernandocorreia.khepri.core.navigation.NavCommand
 import com.fernandocorreia.khepri.core.navigation.NavigationState
+import com.fernandocorreia.khepri.core.navigation.Route
 
 /**
  * The selected tab's stack (design 8.2): one `NavDisplay` per tab under `key(tab)`, the tab's composed state kept in a
@@ -22,6 +23,8 @@ import com.fernandocorreia.khepri.core.navigation.NavigationState
  */
 @Composable
 public fun TabHost(state: NavigationState, installers: Set<EntryInstaller>, modifier: Modifier = Modifier) {
+    if (state.suspended) return
+    val provider = remember(installers) { entryProvider<Route> { installers.forEach { with(it) { install() } } } }
     key(state.epoch) {
         val tabs = rememberSaveableStateHolder()
         val tab = state.selected
@@ -33,7 +36,7 @@ public fun TabHost(state: NavigationState, installers: Set<EntryInstaller>, modi
                 remember(tab) { state.takeStale(tab).onEach(entryStates::removeState) }
                 DisposableEffect(tab) {
                     state.composing(tab)
-                    onDispose { state.composing(null) }
+                    onDispose { state.leaving(tab) }
                 }
                 NavDisplay(
                     backStack = stack,
@@ -45,7 +48,7 @@ public fun TabHost(state: NavigationState, installers: Set<EntryInstaller>, modi
                             rememberViewModelStoreNavEntryDecorator(state.provider(tab)),
                         ),
                     sceneStrategies = listOf(BottomSheetSceneStrategy()),
-                    entryProvider = entryProvider { installers.forEach { with(it) { install() } } },
+                    entryProvider = provider,
                 )
             }
         }

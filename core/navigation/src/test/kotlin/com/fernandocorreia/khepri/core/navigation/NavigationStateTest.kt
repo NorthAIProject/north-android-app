@@ -3,6 +3,7 @@ package com.fernandocorreia.khepri.core.navigation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.fernandocorreia.khepri.core.common.SignOutReason
 import com.fernandocorreia.khepri.core.navigation.AppTab.More
@@ -51,19 +52,19 @@ class NavigationStateTest {
 
     @Test
     fun `a link opened while signed out is held and lands once signed in`() = runTest {
-        signedIn.signedIn.value = false
+        signedIn.account.value = null
         val state = state()
         queue.open(AppDestination.Goal("g1"))
         runCurrent()
         assertEquals(Today, state.selected)
-        signedIn.signedIn.value = true
+        signedIn.account.value = "u1"
         runCurrent()
         assertEquals(More, state.selected)
         assertEquals(listOf(Route.TabRoot(More), Route.Section("goals"), Route.Goal("g1")), state.stack(More))
     }
 
     @Test
-    fun `stacks, the selected tab and crew openings survive process death`() = runTest {
+    fun `stacks, the selected tab and crew openings survive process death, sheets aside`() = runTest {
         val handle = SavedStateHandle()
         val state = state(handle)
         queue.open(AppDestination.CrewChannel("66666666-6666-6666-6666-666666666666", "c1"))
@@ -71,7 +72,7 @@ class NavigationStateTest {
         runCurrent()
         val restored = state(SavedStateHandle(mapOf("navigation" to handle.get<String>("navigation"))))
         assertEquals(More, restored.selected)
-        assertEquals(state.stack(More).toList(), restored.stack(More).toList())
+        assertEquals(state.stack(More).dropLast(1), restored.stack(More).toList())
         assertEquals("o1", (restored.stack(More)[2] as Route.CrewSpace).opening)
     }
 
@@ -127,7 +128,8 @@ class NavigationStateTest {
         val root = state.probe(Today, Route.TabRoot(Today))
         val epoch = state.epoch
         NavigationSignOutCleaner(registry, TestDispatcherProvider(main.dispatcher)).afterLogout(SignOutReason.Explicit)
-        assertTrue(signedIn.signedIn.value)
+        assertEquals("u1", signedIn.account.value)
+        assertTrue(state.suspended)
         assertTrue(root.cleared)
         assertEquals(Today, state.selected)
         AppTab.entries.forEach { assertEquals(listOf(Route.TabRoot(it)), state.stack(it)) }
@@ -140,11 +142,11 @@ class NavigationStateTest {
         val state = state()
         state.apply(NavCommand.Open(AppDestination.Goal("g1")))
         val epoch = state.epoch
-        signedIn.signedIn.value = false
+        signedIn.account.value = null
         runCurrent()
         assertEquals(listOf(Route.TabRoot(More)), state.stack(More))
         assertTrue(state.epoch > epoch)
-        signedIn.signedIn.value = true
+        signedIn.account.value = "u1"
         runCurrent()
         assertEquals(epoch + 1, state.epoch)
     }
@@ -152,12 +154,92 @@ class NavigationStateTest {
     @Test
     fun `a link that arrives after sign-out is kept for the next session`() = runTest {
         val state = state()
-        signedIn.signedIn.value = false
+        signedIn.account.value = null
         runCurrent()
         queue.open(AppDestination.Section("care"))
         runCurrent()
-        signedIn.signedIn.value = true
+        signedIn.account.value = "u1"
         runCurrent()
         assertEquals(listOf(Route.TabRoot(More), Route.Section("care")), state.stack(More))
+    }
+
+    /** The bundle as saved before sign-out: a write after `onSaveInstanceState` never reaches it. */
+    private fun TestScope.savedWithGoal(): String? {
+        val handle = SavedStateHandle()
+        val first = state(handle)
+        first.apply(NavCommand.Open(AppDestination.Goal("g1")))
+        val saved = handle.get<String>("navigation")
+        close(first)
+        signedIn.account.value = null
+        return saved
+    }
+
+    private fun close(model: ViewModel) {
+        val store = ViewModelStore()
+        val factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: KClass<T>, extras: CreationExtras): T = model as T
+            }
+        ViewModelProvider.create(store, factory)[model::class]
+        store.clear()
+    }
+
+    @Test
+    fun `stacks saved for another account start from the roots, and links queued meanwhile still land`() = runTest {
+        val restored = state(SavedStateHandle(mapOf("navigation" to savedWithGoal())))
+        queue.open(AppDestination.Section("care"))
+        runCurrent()
+        assertEquals(More, restored.selected)
+        signedIn.account.value = "u2"
+        runCurrent()
+        assertEquals(listOf(Route.TabRoot(More), Route.Section("care")), restored.stack(More))
+    }
+
+    @Test
+    fun `stacks saved for the same account are kept through a launch`() = runTest {
+        val restored = state(SavedStateHandle(mapOf("navigation" to savedWithGoal())))
+        signedIn.account.value = "u1"
+        runCurrent()
+        assertEquals(listOf(Route.TabRoot(More), Route.Section("goals"), Route.Goal("g1")), restored.stack(More))
+    }
+
+    @Test
+    fun `the epoch survives process death and sheets are never saved`() = runTest {
+        val handle = SavedStateHandle()
+        val state = state(handle)
+        state.reset()
+        state.apply(NavCommand.Open(AppDestination.Exercise("push-up")))
+        val restored = state(SavedStateHandle(mapOf("navigation" to handle.get<String>("navigation"))))
+        assertEquals(state.epoch, restored.epoch)
+        assertEquals(listOf(Route.TabRoot(Today)), restored.stack(Today))
+    }
+
+    @Test
+    fun `a composed tab popped in the frame it leaves is cleared when it leaves`() = runTest {
+        val state = state()
+        state.apply(NavCommand.Open(AppDestination.Goal("g1")))
+        state.composing(More)
+        val goal = state.probe(More, Route.Goal("g1"))
+        state.apply(NavCommand.Pop)
+        state.apply(NavCommand.Open(AppDestination.Tab(Today)))
+        state.composing(Today)
+        state.leaving(More)
+        assertTrue(goal.cleared)
+        assertEquals(setOf(Route.Goal("g1").contentKey()), state.takeStale(More))
+        val section = state.probe(More, Route.Section("goals"))
+        assertFalse(section.cleared)
+    }
+
+    @Test
+    fun `a late leaving call for another tab does not unsettle the composed one`() = runTest {
+        val state = state()
+        state.apply(NavCommand.Open(AppDestination.Goal("g1")))
+        state.composing(Today)
+        state.composing(More)
+        state.leaving(Today)
+        val goal = state.probe(More, Route.Goal("g1"))
+        state.apply(NavCommand.Pop)
+        assertFalse(goal.cleared)
     }
 }

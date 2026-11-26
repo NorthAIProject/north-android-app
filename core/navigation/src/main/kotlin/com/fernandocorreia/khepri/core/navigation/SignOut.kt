@@ -13,11 +13,14 @@ public class NavigationRegistry @Inject constructor() {
     @Volatile internal var live: NavigationState? = null
 }
 
-/** Resets every stack and ViewModel store on the main thread before the phase becomes signed out. */
+/**
+ * Resets every stack and ViewModel store on the main thread before the phase becomes signed out, and suspends the host
+ * until then.
+ */
 internal class NavigationSignOutCleaner
 @Inject
 constructor(private val registry: NavigationRegistry, private val dispatchers: DispatcherProvider) : SignOutCleaner {
     override suspend fun afterLogout(reason: SignOutReason) {
-        withContext(dispatchers.main) { registry.live?.reset() }
+        withContext(dispatchers.main) { registry.live?.signingOut() }
     }
 }
