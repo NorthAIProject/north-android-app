@@ -10,6 +10,7 @@ import com.fernandocorreia.khepri.core.common.DefaultDispatcherProvider
 import com.fernandocorreia.khepri.core.common.DispatcherProvider
 import com.fernandocorreia.khepri.core.common.SharedFlowConsentSignal
 import com.fernandocorreia.khepri.core.common.SharedFlowDataChangeBus
+import com.fernandocorreia.khepri.core.common.SystemZoneClock
 import com.fernandocorreia.khepri.core.common.WireJson
 import dagger.Binds
 import dagger.Module
@@ -34,7 +35,7 @@ internal abstract class CommonBindings {
     @Binds abstract fun dispatchers(provider: DefaultDispatcherProvider): DispatcherProvider
 
     companion object {
-        @Provides fun clock(): Clock = Clock.systemDefaultZone()
+        @Provides fun clock(): Clock = SystemZoneClock
 
         @Provides
         @Singleton

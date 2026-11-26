@@ -64,4 +64,20 @@ class AccountStateNeedsCleanerTest {
             """
         assertEquals(0, rule.lint(code).size)
     }
+
+    @Test
+    fun `flags state behind a delegate, a call chain, a declared type and a var`() {
+        val code =
+            """
+            @Singleton
+            class Store @Inject constructor(private val source: Source) {
+                private val lazyState by lazy { MutableStateFlow(0) }
+                private val chained = MutableStateFlow(0).also { it.value = 1 }
+                private val typed: MutableMap<String, Int> = source.map()
+                @Volatile private var last: String? = null
+                private val fixed = listOf(1, 2)
+            }
+            """
+        assertEquals(4, rule.lint(code).size)
+    }
 }

@@ -6,14 +6,17 @@ import dev.detekt.api.Finding
 import dev.detekt.api.Rule
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtClass
-import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
-import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
+import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.psiUtil.anyDescendantOfType
 
 /**
- * A `@Singleton` that holds a `MutableStateFlow` or a `mutableMapOf` outlives the account that filled it, so it must
- * implement `SignOutCleaner`, or carry `@Suppress("AccountStateNeedsCleaner")` with a comment saying why the state is
- * not account-bound. Matches by name, without type resolution, which the `detekt` task does not run.
+ * A `@Singleton` that holds account state outlives the account that filled it, so it must implement `SignOutCleaner`,
+ * or carry `@Suppress("AccountStateNeedsCleaner")` with a comment saying why the state is not account-bound. State is a
+ * `var`, a property typed `MutableStateFlow` or `MutableMap`, or one whose initializer or delegate (`by lazy`) calls
+ * `MutableStateFlow(` or `mutableMapOf(`. Matches by name, without type resolution, which the `detekt` task does not
+ * run.
  */
 class AccountStateNeedsCleaner(config: Config) :
     Rule(config, "Account-bound state in a singleton must be cleared at sign-out: implement SignOutCleaner.") {
@@ -24,7 +27,7 @@ class AccountStateNeedsCleaner(config: Config) :
         klass.body
             ?.properties
             .orEmpty()
-            .filter { it.initializer.holdsState() }
+            .filter { it.holdsState() }
             .forEach {
                 report(
                     Finding(
@@ -35,14 +38,23 @@ class AccountStateNeedsCleaner(config: Config) :
             }
     }
 
-    private fun KtExpression?.holdsState(): Boolean {
-        val call = this as? KtCallExpression ?: (this as? KtDotQualifiedExpression)?.selectorExpression
-        val callee = (call as? KtCallExpression)?.calleeExpression as? KtNameReferenceExpression
-        return callee?.getReferencedName() in HOLDERS
+    private fun KtProperty.holdsState(): Boolean =
+        isVar ||
+            typeReference?.text?.let { type -> TYPES.any { it in type } } == true ||
+            initializer.callsHolder() ||
+            delegateExpression.callsHolder()
+
+    private fun KtElement?.callsHolder(): Boolean {
+        if (this == null) return false
+        return (this as? KtCallExpression).isHolder() || anyDescendantOfType<KtCallExpression> { it.isHolder() }
     }
+
+    private fun KtCallExpression?.isHolder(): Boolean =
+        (this?.calleeExpression as? KtNameReferenceExpression)?.getReferencedName() in HOLDERS
 
     private companion object {
         const val CLEANER = "SignOutCleaner"
         val HOLDERS = setOf("MutableStateFlow", "mutableMapOf")
+        val TYPES = listOf("MutableStateFlow", "MutableMap")
     }
 }

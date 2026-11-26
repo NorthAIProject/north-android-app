@@ -25,4 +25,10 @@ public sealed interface AppError {
 
     /** The response could not be decoded. */
     public data object InvalidResponse : AppError
+
+    /**
+     * The account that asked signed out before the answer was stored, so it was dropped. The screen is going away: show
+     * nothing for it.
+     */
+    public data object SignedOut : AppError
 }

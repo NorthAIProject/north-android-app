@@ -28,5 +28,6 @@ public fun AppError.description(resources: Resources): String {
         is AppError.Network -> text(R.string.error_offline_body)
         AppError.Locked -> text(R.string.unlock_your_phone_to_continue)
         AppError.InvalidResponse -> text(R.string.invalid_server_response)
+        AppError.SignedOut -> text(R.string.error_generic_body)
     }
 }

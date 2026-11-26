@@ -9,6 +9,7 @@ import com.fernandocorreia.khepri.core.api.ApiJson
 import com.fernandocorreia.khepri.core.api.endpoint.DayApi
 import com.fernandocorreia.khepri.core.api.endpoint.FastingApi
 import com.fernandocorreia.khepri.core.api.endpoint.TodayApi
+import com.fernandocorreia.khepri.core.api.model.DayResponseDto
 import com.fernandocorreia.khepri.core.api.model.TodayResponseDto
 import com.fernandocorreia.khepri.core.common.DispatcherProvider
 import com.fernandocorreia.khepri.core.common.SignOutReason
@@ -23,6 +24,7 @@ import com.fernandocorreia.khepri.feature.today.data.repository.TodayRepositoryI
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import javax.inject.Provider
@@ -68,7 +70,7 @@ class TodayRepositoryImplTest {
             .build()
     private val rows = database.snapshots()
     private val today = LocalDate.parse("2026-11-26")
-    private val clock = Clock.fixed(Instant.parse("2026-11-26T09:00:00Z"), ZoneOffset.UTC)
+    private val clock = MovableClock(Instant.parse("2026-11-26T09:00:00Z"))
     private val dispatchers =
         object : DispatcherProvider {
             override val main = Dispatchers.Default
@@ -122,8 +124,8 @@ class TodayRepositoryImplTest {
     private fun todayJson(streak: Int) =
         ApiJson.default.encodeToString(TodayResponseDto.serializer(), todayWithStreak(streak))
 
-    private suspend fun seedToday(streak: Int) =
-        cache.putIf({ true }, "a", "today", todayWithStreak(streak), TodayResponseDto.serializer())
+    private suspend fun seedToday(streak: Int, account: String = "a") =
+        cache.putIf({ true }, account, "today", todayWithStreak(streak), TodayResponseDto.serializer())
 
     private suspend fun stored(account: String, key: String) = rows.observe(account, key).first()
 
@@ -243,4 +245,73 @@ class TodayRepositoryImplTest {
         assertNull(repository.observeDay(older).first())
         assertNull(repository.observeToday().first()?.refreshError)
     }
+
+    @Test
+    fun `today is asked for without a date and other days with theirs`() = runTest {
+        answer(Goldens.text("day"))
+        answer(Goldens.text("day"))
+        repository.refreshDay(today)
+        repository.refreshDay(today.minusDays(3))
+        assertFalse("date=" in requireNotNull(server.takeRequest().url).toString())
+        assertTrue("date=2026-11-23" in requireNotNull(server.takeRequest().url).toString())
+    }
+
+    @Test
+    fun `a stored day stops being today at midnight`() = runTest {
+        answer(Goldens.text("day"))
+        repository.refreshDay(today)
+        assertEquals(true, repository.observeDay(today).first()?.value?.isToday)
+        clock.now = clock.now.plusSeconds(DAY_SECONDS)
+        assertEquals(false, repository.observeDay(today).first()?.value?.isToday)
+    }
+
+    @Test
+    fun `a day observed across midnight shows the refresh that now lands in memory`() = runTest {
+        val yesterday = today.minusDays(1)
+        answer(Goldens.text("day"))
+        answer(Goldens.day { it.with("streak", JsonPrimitive(92)) }.let { encodeDay(it) })
+        repository.observeDay(yesterday).test {
+            assertNull(awaitItem())
+            repository.refreshDay(yesterday)
+            assertEquals(91, awaitItem()?.value?.streak)
+            clock.now = clock.now.plusSeconds(DAY_SECONDS)
+            repository.refreshDay(yesterday)
+            assertEquals(92, awaitItem()?.value?.streak)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `replies held in memory that land after a sign-out are dropped, and the next account sees none`() = runTest {
+        val older = today.minusDays(3)
+        answer(Goldens.text("day"), delayMs = 400)
+        answer("""{"error":{"message":"down"}}""", code = 500, delayMs = 400)
+        val day = async(Dispatchers.Default) { repository.refreshDay(older) }
+        val failed = async(Dispatchers.Default) { repository.refreshToday() }
+        awaitRequests(2)
+        account.value = null
+        repository.afterLogout(SignOutReason.Explicit)
+        account.value = "b"
+        // Which reply each call gets depends on arrival order; neither may leave anything behind.
+        assertTrue(day.await() is Outcome.Err)
+        assertTrue(failed.await() is Outcome.Err)
+        assertNull(repository.observeDay(older).first())
+        seedToday(6, account = "b")
+        assertNull(repository.observeToday().first()?.refreshError)
+    }
+
+    private fun encodeDay(day: DayResponseDto) = ApiJson.default.encodeToString(DayResponseDto.serializer(), day)
+
+    private companion object {
+        const val DAY_SECONDS = 86_400L
+    }
+}
+
+/** A clock in UTC whose [now] a test moves. */
+private class MovableClock(@Volatile var now: Instant) : Clock() {
+    override fun getZone(): ZoneOffset = ZoneOffset.UTC
+
+    override fun withZone(zone: ZoneId): Clock = this
+
+    override fun instant(): Instant = now
 }

@@ -37,6 +37,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -64,13 +65,17 @@ constructor(
     private val memory = TodayMemory(::current, clock)
 
     override fun observeToday(): Flow<Cached<Today>?> =
-        observeStored(CacheKeys.TODAY, TodayResponseDto.serializer()) { it.toToday() }
+        observeStored(CacheKeys.TODAY, TodayResponseDto.serializer(), { it.toToday() })
 
+    /**
+     * Today and yesterday are written to disk and other days to memory, but a flow started before midnight outlives
+     * that split, so both are read and the newer wins. `isToday` is worked out on read: a stored day stops being today
+     * at midnight.
+     */
     override fun observeDay(date: LocalDate): Flow<Cached<Day>?> =
-        if (date in CacheKeys.keptDays(clock)) {
-            observeStored(CacheKeys.day(date), DayResponseDto.serializer()) { it.toDay() }
-        } else {
-            memory.observeDay(date)
+        observeStored(CacheKeys.day(date), DayResponseDto.serializer(), { it.toDay() }) { disk ->
+            combine(disk, memory.day(date)) { stored, held -> listOfNotNull(stored, held).maxByOrNull { it.fetchedAt } }
+                .map { it?.let { day -> StoredValue(day.value.copy(isToday = date == today()), day.fetchedAt) } }
         }
 
     override suspend fun refreshToday(): Outcome<Unit> =
@@ -83,7 +88,8 @@ constructor(
 
     override suspend fun refreshDay(date: LocalDate): Outcome<Unit> {
         val key = CacheKeys.day(date)
-        val fetch = suspend { apiCall(map = { it to it.toDay() }) { dayApi.getDay(date) } }
+        // Today goes without a date, as on iOS: the server picks the day in the profile's time zone.
+        val fetch = suspend { apiCall(map = { it to it.toDay() }) { dayApi.getDay(date.takeIf { it != today() }) } }
         return refresh(key, fetch) { account, (response, day) ->
             val kept = CacheKeys.keptDays(clock)
             if (date in kept) {
@@ -103,12 +109,17 @@ constructor(
     override suspend fun afterLogout(reason: SignOutReason) = memory.clear()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun <D, T> observeStored(key: String, serializer: KSerializer<D>, map: (D) -> T): Flow<Cached<T>?> =
+    private fun <D, T> observeStored(
+        key: String,
+        serializer: KSerializer<D>,
+        map: (D) -> T,
+        adjust: (Flow<StoredValue<T>?>) -> Flow<StoredValue<T>?> = { it },
+    ): Flow<Cached<T>?> =
         signedIn.account.flatMapLatest { account ->
             if (account == null) {
                 flowOf(null)
             } else {
-                memory.withError(key, cache.observe(account, key, serializer).map { it?.mapOrNull(map) })
+                memory.withError(key, adjust(cache.observe(account, key, serializer).map { it?.mapOrNull(map) }))
             }
         }
 
@@ -143,8 +154,10 @@ constructor(
 
     private fun current(account: String) = signedIn.account.value == account
 
+    private fun today() = LocalDate.now(clock)
+
     private companion object {
-        val SIGNED_OUT = AppError.Unauthorized(null)
+        val SIGNED_OUT = AppError.SignedOut
     }
 }
 

@@ -31,8 +31,8 @@ internal class TodayMemory(private val isCurrent: (account: String) -> Boolean, 
             }
             .distinctUntilChanged()
 
-    fun observeDay(date: LocalDate): Flow<Cached<Day>?> =
-        withError(CacheKeys.day(date), days.map { it[date] }.distinctUntilChanged())
+    /** The day held for [date], if one was fetched this session. */
+    fun day(date: LocalDate): Flow<StoredValue<Day>?> = days.map { it[date] }.distinctUntilChanged()
 
     /** Records [error] for [key], or clears it when null. Returns whether it wrote. */
     fun recordError(account: String, key: String, error: AppError?): Boolean =
