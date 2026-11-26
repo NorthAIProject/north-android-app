@@ -1,0 +1,32 @@
+{
+  "error_generic_body": {
+    "en": "Something went wrong on our side. Try again in a moment.",
+    "es": "Algo ha fallado por nuestra parte. Inténtalo de nuevo en un momento.",
+    "pt-PT": "Algo correu mal do nosso lado. Tenta outra vez daqui a pouco.",
+    "pt-BR": "Algo deu errado do nosso lado. Tente de novo em instantes."
+  },
+  "error_generic_title": {
+    "en": "Couldn't load this",
+    "es": "No se pudo cargar",
+    "pt-PT": "Não foi possível carregar",
+    "pt-BR": "Não foi possível carregar"
+  },
+  "error_offline_body": {
+    "en": "Check your connection and try again.",
+    "es": "Comprueba tu conexión e inténtalo de nuevo.",
+    "pt-PT": "Verifica a ligação e tenta outra vez.",
+    "pt-BR": "Verifique sua conexão e tente de novo."
+  },
+  "error_offline_title": {
+    "en": "Offline",
+    "es": "Sin conexión",
+    "pt-PT": "Sem ligação",
+    "pt-BR": "Sem conexão"
+  },
+  "error_try_again": {
+    "en": "Try Again",
+    "es": "Reintentar",
+    "pt-PT": "Tentar outra vez",
+    "pt-BR": "Tentar de novo"
+  }
+}

@@ -42,4 +42,5 @@ Kotlin + Jetpack Compose port of the iOS app in `../north-ios-app/khepri` (abbre
 
 ## Commands
 
-None yet. Phase 1 adds `./gradlew check` and `./gradlew syncContract --check`.
+- `./gradlew check` runs everything CI runs, including `checkTranslations` and the `tools/` tests.
+- `python3 tools/convert_strings.py [--check]` regenerates `core/ui` strings from the iOS catalogs. Never edit the generated `strings.xml`; Android-only copy goes in `tools/strings-android.json`.

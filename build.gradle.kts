@@ -42,4 +42,20 @@ dependencyAnalysis {
     }
 }
 
-tasks.named("check") { dependsOn("assertModuleGraph", "buildHealth", "spotlessCheck") }
+val checkTranslations =
+    tasks.register<Exec>("checkTranslations") {
+        description = "Fails when a string is missing from, or extra in, any locale of any module."
+        group = "verification"
+        commandLine("python3", "tools/check_translations.py")
+    }
+
+val testStringTools =
+    tasks.register<Exec>("testStringTools") {
+        description = "Runs the tests of the string and theme tools in tools/."
+        group = "verification"
+        commandLine("python3", "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py")
+    }
+
+tasks.named("check") {
+    dependsOn("assertModuleGraph", "buildHealth", "spotlessCheck", checkTranslations, testStringTools)
+}

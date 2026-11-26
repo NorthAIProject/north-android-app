@@ -585,10 +585,19 @@ interface Navigator { fun open(destination: AppDestination); fun open(link: Stri
 **Interfaces:**
 - Produces: `python3 tools/convert_strings.py` regenerates the four files from `K/khepri/Resources/Localizable.xcstrings`, `K/KhepriWidgets/Localizable.xcstrings`, `K/KhepriShare/Localizable.xcstrings` and `K/NorthKit/Sources/NorthAPI/Resources/Localizable.xcstrings`; `python3 tools/check_translations.py` exits non-zero when any key is missing from any locale in any module.
 
-- [ ] **Step 1:** Tests for the converter: a plain key; a key with one `%@` and one `%lld` becomes `%1$s` and `%2$d`; a plural variation becomes `<plurals>`; apostrophes and `&` are escaped; a key already in `strings-keys.json` keeps its name when the English text changes; a new key gets a generated snake-case name.
-- [ ] **Step 2:** Implement. Run on the real catalogs. Expected: four files with the same key set.
-- [ ] **Step 3:** Wire `check_translations.py` into `check` and CI. (Lint `MissingTranslation` also catches it; the script covers the per-module case and gives a readable list.)
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** Tests for the converter: a plain key; a key with one `%@` and one `%lld` becomes `%1$s` and `%2$d`; a plural variation becomes `<plurals>`; apostrophes and `&` are escaped; a key already in `strings-keys.json` keeps its name when the English text changes; a new key gets a generated snake-case name.
+- [x] **Step 2:** Implement. Run on the real catalogs. Expected: four files with the same key set.
+- [x] **Step 3:** Wire `check_translations.py` into `check` and CI. (Lint `MissingTranslation` also catches it; the script covers the per-module case and gives a readable list.)
+- [x] **Step 4:** Commit.
+
+**Done (2026-11-26).** 1,999 strings and 2 plurals per locale from 2,080 catalog keys (75 shared between catalogs, emitted once, preferring a translated copy). 19 tool tests run in `check` as `testStringTools`; `checkTranslations` runs there too, so CI covers both. Deviations:
+
+- **`tools/strings-android.json` holds copy only Android has.** iOS shows raw error text and has no localized error screen, so Task 8's five `error_*` strings live there and keep their names.
+- **Left out and listed by the converter:** 4 keys iOS has not translated (`High`, `Likely`, `Line`, the long body-figure credit) and 7 keys marked stale. iOS falls back to English for the first four; Android would fail `MissingTranslation`. Translate them in the iOS catalog, then regenerate.
+- **A string with no arguments is literal** (`formatted="false"`), as SwiftUI shows `About 60% of the sets`. A translation whose arguments differ from the English is rejected, not emitted (none today). Spanish and Portuguese plurals get `many` copied from `other` (CLDR).
+- **Lint's `PluralsCandidate`, `TypographyDashes`, `Typos` and `UnusedResources` are off in the generated files only.** The two typos are false positives (pt-PT `quilómetro`, "check-in in one tap"). The 82 plural candidates are real ("Check-in streak, 1 days") and exist on iOS too: fix them as plural variations in the iOS catalog and they regenerate as `<plurals>`. The 5 em dashes in iOS copy are kept as is.
+- `convert_strings.py --check` needs the iOS checkout beside this repo, so it is not in CI; run it after pulling iOS copy changes.
+
 
 ### Task 11: `:feature:auth` first slice — email sign-in and sign-up
 
