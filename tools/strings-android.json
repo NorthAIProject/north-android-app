@@ -34,5 +34,8 @@
     "es": "Reintentar",
     "pt-PT": "Tentar outra vez",
     "pt-BR": "Tentar de novo"
+  },
+  "placeholder_body": {
+    "en": "This screen arrives in a later phase."
   }
 }

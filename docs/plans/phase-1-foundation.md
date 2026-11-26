@@ -670,6 +670,17 @@ class SignInWithEmail(repo: AuthRepository, gateway: SessionGateway) { suspend o
 - **Not ported yet:** the banner icons and the sheet's lock symbol (no icon set until Phase 2), the banner's slide-in (it appears without animation), and passkey, Google and Apple (lane F). iOS's unreachable "Please enter a valid email address" path for the reset sheet is dropped: its button is disabled until the address is valid.
 - **The convention plugins add less.** `feature.data` no longer adds `:core:common` and `feature.ui` no longer adds `:core:navigation`; dependency analysis rejects them where unused, so each module declares them. Data modules get Retrofit, since the generated interfaces return `retrofit2.Response`.
 
+**Fable review of Task 11 (2026-11-26).** No high findings. Fixed:
+
+- Nothing typed outlives a sign-in: on success the ViewModel resets its state and asks for an autofill commit; the signed-out screens' ViewModels also live in a store cleared when the phase leaves `SignedOut` (Task 12's `AppViewModel.signedOutStore`).
+- Dismissing the reset sheet cancels a reset still in flight, so a late answer never lands on a newer sheet.
+- A failed reset shows its error in the sheet (with the error haptic), not in a banner hidden behind it.
+- Autofill: the email field is `Username` + `EmailAddress`, and a successful sign-in or sign-up commits the autofill session.
+- Password events print `***`; the reset sends the trimmed email and the sheet opens prefilled with it; Cancel hides the sheet with its animation before closing it.
+- The reset test answers 202, as the server does.
+
+Open: the banner's live region is not yet checked with TalkBack on a device.
+
 ### Task 12: `:app` — phase root, tab shell, links, smoke flow
 
 **Files:**
@@ -681,22 +692,35 @@ class SignInWithEmail(repo: AuthRepository, gateway: SessionGateway) { suspend o
 **Interfaces:**
 - Consumes: `SessionManager.phase`, `Navigator`, the `EntryInstaller` set, `LoginScreen`.
 
-- [ ] **Step 1:** `RootContentTest` (Robolectric Compose): each `AppPhase` renders its screen; `Failed` shows Try Again and Sign Out; `Locked` never shows the login form.
-- [ ] **Step 2:** `HiltGraphTest` (Robolectric + Hilt test runner): the application component builds; `TokenSource`, both OkHttp clients, `SessionManager` and `Navigator` resolve (no dependency cycle).
-- [ ] **Step 3:** Implement `RootContent`. `Onboarding` shows a placeholder with Sign Out until Phase 3. `LockedRetry` calls `SessionManager.retry()` on `ON_START` and `ACTION_USER_UNLOCKED` while `Locked`.
-- [ ] **Step 4:** `MainTabs`: five tabs with labels from strings, one stack each, placeholder roots; More shows Sign Out with a confirmation dialog.
-- [ ] **Step 5:** Manifest intent filters: scheme `khepri`; `https://kheprios.com` paths `/app` and `/i` with `autoVerify`. `MainActivity` passes incoming links to `Navigator.open(link)` and opens the browser when it returns false.
-- [ ] **Step 6:** StrictMode in debug: thread policy (disk, network) and VM policy (leaked closables) with `penaltyDeath`.
-- [ ] **Step 7:** Start the backend at the pinned SHA, not from the working checkout: `git -C ../north-client worktree add ../north-client-pinned $(cat core/api/contract.sha)`, then run it as `../north-client/AGENTS.md` describes, on port 8090. Seed it (read `K/scripts/seed-review-account.sh` for the account).
-- [ ] **Step 8:** Write `smoke-sign-in.yaml`: launch, sign in, assert the Today tab, tap each tab, open `khepri://more` and assert the More tab, sign out, assert the login screen.
-- [ ] **Step 9:** Run `maestro test maestro/flows/smoke-sign-in.yaml`. Expected: PASS.
-- [ ] **Step 10:** Run `./gradlew check :app:assembleRelease`. Expected: BUILD SUCCESSFUL. Push; CI green. Commit.
+- [x] **Step 1:** `RootContentTest` (Robolectric Compose): each `AppPhase` renders its screen; `Failed` shows Try Again and Sign Out; `Locked` never shows the login form.
+- [x] **Step 2:** `HiltGraphTest` (Robolectric + Hilt test runner): the application component builds; `TokenSource`, both OkHttp clients, `SessionManager` and `Navigator` resolve (no dependency cycle).
+- [x] **Step 3:** Implement `RootContent`. `Onboarding` shows a placeholder with Sign Out until Phase 3. `LockedRetry` calls `SessionManager.retry()` on `ON_START` and `ACTION_USER_UNLOCKED` while `Locked`.
+- [x] **Step 4:** `MainTabs`: five tabs with labels from strings, one stack each, placeholder roots; More shows Sign Out with a confirmation dialog.
+- [x] **Step 5:** Manifest intent filters: scheme `khepri`; `https://kheprios.com` paths `/app` and `/i` with `autoVerify`. `MainActivity` passes incoming links to `Navigator.open(link)` and opens the browser when it returns false.
+- [x] **Step 6:** StrictMode in debug: thread policy (disk, network) and VM policy (leaked closables) with `penaltyDeath`.
+- [x] **Step 7:** Start the backend at the pinned SHA, not from the working checkout: `git -C ../north-client worktree add ../north-client-pinned $(cat core/api/contract.sha)`, then run it as `../north-client/AGENTS.md` describes, on port 8090. Seed it (read `K/scripts/seed-review-account.sh` for the account).
+- [x] **Step 8:** Write `smoke-sign-in.yaml`: launch, sign in, assert the Today tab, tap each tab, open `khepri://more` and assert the More tab, sign out, assert the login screen.
+- [x] **Step 9:** Run `maestro test maestro/flows/smoke-sign-in.yaml`. Expected: PASS.
+- [x] **Step 10:** Run `./gradlew check :app:assembleRelease`. Expected: BUILD SUCCESSFUL. Push; CI green. Commit.
+
+**Done (2026-11-26).** 1,018 tests green in `check`. The smoke flow passes against the backend at `6823e58c` on the `minified` build (release code under R8) and on `debug` (StrictMode with `penaltyDeath`, no violations). On the emulator, three taps on a placeholder's `SavedStateHandle` counter survive `adb shell am kill`, along with the selected tab and the session. Deviations and findings:
+
+- **The app had no `INTERNET` permission.** No earlier task made a call on a device, so nothing failed. `:core:network` now declares it, and `ManifestTest` checks the merged manifest.
+- **API 37 blocks private addresses** unless the app holds `ACCESS_LOCAL_NETWORK` (a runtime permission). Without it, `10.0.2.2` times out after 15 s with no log. Only the `debug` and `minified` manifests declare it, since release talks only to `kheprios.com`. The flow grants it with `permissions: all: allow`.
+- **The phase root keyed its screens by class.** A `KClass` hashes differently in each process, so after process death nothing saved under the signed-in screen was found: the counter and every `rememberSaveable` came back empty, while the tab (held in a ViewModel) survived. Phases are now keyed by fixed strings (`AppPhase.stateKey()`).
+- **A `minified` build type** (release with debug signing, app id `.minified`, `10.0.2.2:8090`, cleartext only to that host) runs the smoke flow under R8 without touching production.
+- **Test tags are resource ids** (`testTagsAsResourceId`) at the activity root, and again on the sign-out dialog and the reset sheet, which are separate windows.
+- **Links:** used once (`savedInstanceState == null`, then `onNewIntent`), replays from recents ignored, and the intent cleared. An unknown `https` link opens in a browser through a host-less `https:` selector, so it cannot come back to this app once the domain is verified. `autoVerify` cannot pass until `kheprios.com` serves `assetlinks.json` for the release key; the flow proves links with `khepri://`.
+- **No separate `LockedRetry`.** `SessionLifecycle` already retries a locked session on every `ON_START`, and unlocking a phone that shows the app starts it. `ACTION_USER_UNLOCKED` is not registered.
+- **Pending links** (invite and crew codes received while signed out) persist in a Preferences DataStore (`PendingLinksStore`).
+- **Local backend:** in development it refuses to boot without `POSTHOG_API_KEY`. The run used a dummy key with `POSTHOG_HOST` on a closed local port, so no events left the machine. The seeded account's model steps answer 503 without AI keys; the flow does not need them. See `maestro/README.md`.
+- **Emulator:** only one build may be installed, or `khepri://` stops at the "Open with" chooser.
 
 ---
 
 ## Done when
 
-- [ ] A debug build signs in against a locally seeded server, switches tabs, opens a `khepri://` link, signs out.
+- [x] A debug build signs in against a locally seeded server, switches tabs, opens a `khepri://` link, signs out.
 - [ ] `./gradlew check` is green locally and in CI; `./gradlew syncContract --check` is green locally.
 - [ ] Every gate in Task 2 was shown to fail on a deliberate violation.
 - [ ] Contract tests decode every committed golden fixture.

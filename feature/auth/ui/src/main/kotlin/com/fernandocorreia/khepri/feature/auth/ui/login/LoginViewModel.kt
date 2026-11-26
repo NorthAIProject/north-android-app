@@ -12,6 +12,7 @@ import com.fernandocorreia.khepri.feature.auth.domain.usecase.SignUpWithEmail
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Clock
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,9 @@ constructor(
     private val effectChannel = Channel<LoginEffect>(Channel.BUFFERED)
     val effects: Flow<LoginEffect> = effectChannel.receiveAsFlow()
 
+    /** The reset request in flight; dismissing the sheet cancels it, so it never acts on a sheet opened later. */
+    private var reset: Job? = null
+
     fun onEvent(event: LoginEvent) {
         when (event) {
             is LoginEvent.ModeChanged -> mutableState.update { it.copy(mode = event.mode, banner = null) }
@@ -49,11 +53,16 @@ constructor(
             is LoginEvent.ConfirmationChanged -> mutableState.update { it.copy(confirmation = event.value) }
             LoginEvent.Submit -> submit()
             LoginEvent.ForgotPasswordOpened ->
-                mutableState.update { it.copy(forgotPassword = ForgotPasswordState(email = it.email)) }
+                mutableState.update { it.copy(forgotPassword = ForgotPasswordState(email = it.email.trim())) }
             is LoginEvent.ResetEmailChanged ->
-                mutableState.update { it.copy(forgotPassword = it.forgotPassword?.copy(email = event.value)) }
+                mutableState.update {
+                    it.copy(forgotPassword = it.forgotPassword?.copy(email = event.value, error = null))
+                }
             LoginEvent.ResetRequested -> requestPasswordReset()
-            LoginEvent.ForgotPasswordDismissed -> mutableState.update { it.copy(forgotPassword = null) }
+            LoginEvent.ForgotPasswordDismissed -> {
+                reset?.cancel()
+                mutableState.update { it.copy(forgotPassword = null) }
+            }
         }
     }
 
@@ -69,21 +78,32 @@ constructor(
                     LoginMode.SignUp ->
                         signUp(SignUpForm(form.name.trim(), email, form.password, form.confirmation, clock.zone))
                 }
-            mutableState.update { it.copy(running = false) }
-            if (outcome is Outcome.Err) fail(outcome.error)
+            when (outcome) {
+                // Nothing typed outlives the sign-in: as iOS, where the screen's model goes with the screen.
+                is Outcome.Ok -> {
+                    effectChannel.trySend(LoginEffect.CommitAutofill)
+                    mutableState.value = LoginUiState()
+                }
+                is Outcome.Err -> {
+                    mutableState.update { it.copy(running = false) }
+                    fail(outcome.error)
+                }
+            }
         }
     }
 
     private fun requestPasswordReset() {
         val sheet = mutableState.value.forgotPassword ?: return
         if (!sheet.canSend) return
-        mutableState.update { it.copy(forgotPassword = sheet.copy(sending = true)) }
-        viewModelScope.launch {
-            when (val outcome = requestReset(sheet.email)) {
+        mutableState.update { it.copy(forgotPassword = sheet.copy(sending = true, error = null)) }
+        reset = viewModelScope.launch {
+            when (val outcome = requestReset(sheet.email.trim())) {
                 is Outcome.Ok -> mutableState.update { it.copy(forgotPassword = null, banner = LoginBanner.ResetSent) }
                 is Outcome.Err -> {
-                    mutableState.update { it.copy(forgotPassword = it.forgotPassword?.copy(sending = false)) }
-                    fail(outcome.error)
+                    mutableState.update {
+                        it.copy(forgotPassword = it.forgotPassword?.copy(sending = false, error = outcome.error))
+                    }
+                    effectChannel.trySend(LoginEffect.Play(Haptic.Error))
                 }
             }
         }

@@ -1,0 +1,49 @@
+# Sign in, visit every tab, follow a link, sign out. Credentials come from the
+# command line (-e EMAIL=… -e PASSWORD=…); never write them here. See ../README.md.
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    # Local builds reach the backend on 10.0.2.2 only with ACCESS_LOCAL_NETWORK (API 37+).
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000
+- tapOn:
+    id: "login-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "tab-today"
+    timeout: 20000
+- tapOn:
+    id: "tab-coach"
+- tapOn:
+    id: "tab-training"
+- tapOn:
+    id: "tab-progress"
+- tapOn:
+    id: "tab-more"
+- tapOn:
+    id: "tab-today"
+- openLink: khepri://more
+- extendedWaitUntil:
+    visible:
+      id: "sign-out"
+    timeout: 10000
+- tapOn:
+    id: "sign-out"
+- tapOn:
+    id: "sign-out-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "login-email"
+    timeout: 20000

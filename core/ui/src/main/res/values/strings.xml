@@ -1190,6 +1190,7 @@
     <string name="pin">Pin</string>
     <string name="pinned">Pinned</string>
     <string name="pinned_messages">Pinned messages</string>
+    <string name="placeholder_body" translatable="false">This screen arrives in a later phase.</string>
     <string name="plain_forecast">Plain Forecast</string>
     <string name="plan">Plan</string>
     <string name="plan_days">Plan Days</string>

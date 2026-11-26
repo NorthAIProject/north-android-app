@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
@@ -22,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,17 +33,32 @@ import com.fernandocorreia.khepri.core.designsystem.component.KhepriTextField
 import com.fernandocorreia.khepri.core.designsystem.component.ProminentButton
 import com.fernandocorreia.khepri.core.designsystem.theme.KhepriTheme
 import com.fernandocorreia.khepri.core.ui.R
+import com.fernandocorreia.khepri.core.ui.description
+import kotlinx.coroutines.launch
 
 /** iOS `ForgotPasswordSheet`: starts from the login email; closes itself once the link is sent. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ForgotPasswordSheet(state: ForgotPasswordState, onEvent: (LoginEvent) -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     ModalBottomSheet(
         onDismissRequest = { onEvent(LoginEvent.ForgotPasswordDismissed) },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
+        // A sheet is its own window: the activity's resource-id switch does not reach it.
+        modifier = Modifier.semantics { testTagsAsResourceId = true },
         containerColor = KhepriTheme.colors.background,
     ) {
-        ForgotPasswordForm(state, onEvent)
+        ForgotPasswordForm(
+            state = state,
+            onEvent = { event ->
+                if (event == LoginEvent.ForgotPasswordDismissed) {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onEvent(event) }
+                } else {
+                    onEvent(event)
+                }
+            },
+        )
     }
 }
 
@@ -89,6 +106,7 @@ internal fun ForgotPasswordForm(
                     autoCorrectEnabled = false,
                 ),
             keyboardActions = KeyboardActions(onSend = { onEvent(LoginEvent.ResetRequested) }),
+            error = state.error?.description(),
             modifier = Modifier.semantics { contentType = ContentType.EmailAddress }.testTag("reset-email"),
         )
         ProminentButton(

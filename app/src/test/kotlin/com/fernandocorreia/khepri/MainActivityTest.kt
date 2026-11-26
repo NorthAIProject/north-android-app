@@ -1,10 +1,8 @@
 package com.fernandocorreia.khepri
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.takahirom.roborazzi.captureRoboImage
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
@@ -13,11 +11,12 @@ import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.GraphicsMode
 
+/**
+ * The real activity and graph. The session is never started here (HiltTestApplication), so the phase stays Launching.
+ */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = HiltTestApplication::class)
 class MainActivityTest {
     private val hilt = HiltAndroidRule(this)
@@ -26,12 +25,7 @@ class MainActivityTest {
     @get:Rule val rules: RuleChain = RuleChain.outerRule(hilt).around(compose)
 
     @Test
-    fun `shows the app name`() {
-        compose.onNodeWithText("Khepri").assertExists()
-    }
-
-    @Test
-    fun `app root screenshot`() {
-        compose.onRoot().captureRoboImage()
+    fun `the activity composes the phase root`() {
+        compose.onNodeWithTag("phase-launching").assertExists()
     }
 }

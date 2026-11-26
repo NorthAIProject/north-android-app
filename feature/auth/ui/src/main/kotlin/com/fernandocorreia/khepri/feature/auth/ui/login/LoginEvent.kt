@@ -9,9 +9,13 @@ sealed interface LoginEvent {
 
     data class EmailChanged(val value: String) : LoginEvent
 
-    data class PasswordChanged(val value: String) : LoginEvent
+    data class PasswordChanged(val value: String) : LoginEvent {
+        override fun toString(): String = "PasswordChanged(***)"
+    }
 
-    data class ConfirmationChanged(val value: String) : LoginEvent
+    data class ConfirmationChanged(val value: String) : LoginEvent {
+        override fun toString(): String = "ConfirmationChanged(***)"
+    }
 
     data object Submit : LoginEvent
 
@@ -26,4 +30,7 @@ sealed interface LoginEvent {
 
 sealed interface LoginEffect {
     data class Play(val haptic: Haptic) : LoginEffect
+
+    /** The account is in: let the password manager offer to save what was typed. */
+    data object CommitAutofill : LoginEffect
 }

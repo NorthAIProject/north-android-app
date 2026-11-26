@@ -115,7 +115,9 @@ internal fun EmailField(value: String, onEvent: (LoginEvent) -> Unit, modifier: 
         keyboardOptions =
             KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, autoCorrectEnabled = false),
         keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
-        modifier = modifier.semantics { contentType = ContentType.EmailAddress }.testTag("login-email"),
+        // Username too, so password managers file the address as the account name.
+        modifier =
+            modifier.semantics { contentType = ContentType.Username + ContentType.EmailAddress }.testTag("login-email"),
     )
 }
 

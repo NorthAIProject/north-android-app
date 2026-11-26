@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    This build talks to a backend on the developer's machine (10.0.2.2). From API 37 an app needs this runtime
+    permission to reach a private address; without it the connection silently times out. Release only talks to
+    kheprios.com and never asks for it.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+</manifest>

@@ -17,11 +17,15 @@ sealed interface LoginBanner {
     data object ResetSent : LoginBanner
 }
 
-/** The forgot-password sheet, while open. [email] is checked as typed, as on iOS. */
+/**
+ * The forgot-password sheet, while open. [email] is checked trimmed (iOS checks it as typed, so a trailing space from a
+ * keyboard suggestion left Send disabled with no reason). A failed request shows its [error] in the sheet; on iOS it
+ * went to the banner under the sheet, where it could not be seen.
+ */
 @Immutable
-data class ForgotPasswordState(val email: String, val sending: Boolean = false) {
+data class ForgotPasswordState(val email: String, val sending: Boolean = false, val error: AppError? = null) {
     val canSend: Boolean
-        get() = AuthValidation.isValidEmail(email) && !sending
+        get() = AuthValidation.isValidEmail(email.trim()) && !sending
 }
 
 @Immutable

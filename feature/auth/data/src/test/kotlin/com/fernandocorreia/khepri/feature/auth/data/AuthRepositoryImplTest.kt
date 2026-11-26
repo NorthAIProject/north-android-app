@@ -99,8 +99,8 @@ class AuthRepositoryImplTest {
     }
 
     @Test
-    fun `a reset request answers ok with no body`() = runTest {
-        server.enqueue(MockResponse.Builder().code(204).build())
+    fun `a reset request is accepted with no body`() = runTest {
+        server.enqueue(MockResponse.Builder().code(202).build())
         assertEquals(Outcome.Ok(Unit), repository.requestPasswordReset("ana@example.com"))
         val (path, body) = sent()
         assertEquals("/api/v1/auth/forgot-password", path)

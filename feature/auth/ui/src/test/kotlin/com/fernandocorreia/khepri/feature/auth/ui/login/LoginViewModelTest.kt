@@ -130,11 +130,61 @@ class LoginViewModelTest {
     }
 
     @Test
-    fun `a failed reset keeps the sheet open and shows the error`() {
+    fun `a failed reset shows its error in the sheet, not under it`() = runTest {
         repository.resetResult = Outcome.Err(AppError.Network(interrupted = false))
+        model.effects.test {
+            type(LoginEvent.EmailChanged("ana@example.com"), LoginEvent.ForgotPasswordOpened, LoginEvent.ResetRequested)
+            assertEquals(LoginEffect.Play(Haptic.Error), awaitItem())
+        }
+        assertEquals(
+            ForgotPasswordState("ana@example.com", error = AppError.Network(interrupted = false)),
+            state.forgotPassword,
+        )
+        assertNull(state.banner)
+        type(LoginEvent.ResetEmailChanged("bea@example.com"))
+        assertNull(state.forgotPassword?.error)
+    }
+
+    @Test
+    fun `the reset sheet starts from the trimmed login email and sends it trimmed`() {
+        type(LoginEvent.EmailChanged("ana@example.com "), LoginEvent.ForgotPasswordOpened)
+        assertEquals("ana@example.com", state.forgotPassword?.email)
+        type(LoginEvent.ResetEmailChanged(" bea@example.com "))
+        assertEquals(true, state.forgotPassword?.canSend)
+        type(LoginEvent.ResetRequested)
+        assertEquals(listOf("bea@example.com"), repository.resets)
+    }
+
+    @Test
+    fun `dismissing the sheet while sending cancels the request, so it never closes a sheet opened later`() {
+        repository.gate = CompletableDeferred()
         type(LoginEvent.EmailChanged("ana@example.com"), LoginEvent.ForgotPasswordOpened, LoginEvent.ResetRequested)
+        type(LoginEvent.ForgotPasswordDismissed, LoginEvent.ForgotPasswordOpened)
+        repository.gate?.complete(Unit)
         assertEquals(ForgotPasswordState("ana@example.com"), state.forgotPassword)
-        assertEquals(LoginBanner.Failed(AppError.Network(interrupted = false)), state.banner)
+        assertNull(state.banner)
+    }
+
+    @Test
+    fun `nothing typed outlives a sign-in, and the password manager is told to save`() = runTest {
+        model.effects.test {
+            type(
+                LoginEvent.ModeChanged(LoginMode.SignUp),
+                LoginEvent.NameChanged("Ana"),
+                LoginEvent.EmailChanged("ana@example.com"),
+                LoginEvent.PasswordChanged("Secret12"),
+                LoginEvent.ConfirmationChanged("Secret12"),
+                LoginEvent.Submit,
+            )
+            assertEquals(LoginEffect.CommitAutofill, awaitItem())
+        }
+        assertEquals(LoginUiState(), state)
+    }
+
+    @Test
+    fun `events never print the password`() {
+        assertFalse("hunter22" in LoginEvent.PasswordChanged("hunter22").toString())
+        assertFalse("hunter22" in LoginEvent.ConfirmationChanged("hunter22").toString())
     }
 
     @Test
